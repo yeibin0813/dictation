@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>TOEFL 딕테이션</title><style>body{margin:0;padding:0}img{max-width:100%}[hidden]{display:none!important}</style></head><body>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one narrow working column, like an answer sheet; the player sits above the writing line. */
+:root{
+  --bg:#f2f5f6; --panel:#ffffff; --ink:#16242b; --muted:#5b6d75; --line:#d5dee2;
+  --accent:#0d6570; --accent-ink:#ffffff; --accent-soft:#dcedef;
+  --good:#1c7a45; --good-soft:#dff1e6; --bad:#b3362b; --bad-soft:#f8e2df;
+  --sans:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono","D2Coding",Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#10181b; --panel:#182327; --ink:#e6eef0; --muted:#93a6ad; --line:#2c3b41;
+  --accent:#5cc2cd; --accent-ink:#06282d; --accent-soft:#1d3a3f;
+  --good:#6fd49a; --good-soft:#173524; --bad:#f08b80; --bad-soft:#40201c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10181b; --panel:#182327; --ink:#e6eef0; --muted:#93a6ad; --line:#2c3b41;
+  --accent:#5cc2cd; --accent-ink:#06282d; --accent-soft:#1d3a3f;
+  --good:#6fd49a; --good-soft:#173524; --bad:#f08b80; --bad-soft:#40201c; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.6}
+.wrap{max-width:960px;margin:0 auto;padding-inline:16px;padding-block:28px 64px;display:flex;flex-direction:column;gap:20px}
+header.top{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 16px}
+h1{font-size:1.5rem;margin:0;font-weight:700;letter-spacing:-.01em}
+h1 small{font-family:var(--mono);font-size:.8rem;font-weight:500;color:var(--muted);margin-left:8px;letter-spacing:.04em}
+h2{font-size:1.05rem;margin:0;font-weight:600}
+.tabs{display:flex;gap:4px}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tab{background:none;border:0;padding:6px 12px;border-radius:6px;color:var(--muted);font-weight:500}
+.tab[aria-selected="true"]{background:var(--accent-soft);color:var(--ink)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;display:flex;flex-direction:column;gap:16px}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:var(--muted);flex:1 1 200px;min-width:0}
+.panel>label.f{flex:0 0 auto}
+input[type=text],textarea,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;width:100%}
+textarea,.blank,.mono{font-family:var(--mono)}
+textarea{min-height:92px;resize:vertical;font-size:1.02rem;line-height:1.7}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{background:var(--bg);border:0;padding:8px 14px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);font-weight:600}
+.sets{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.sets li{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:12px 0;border-top:1px solid var(--line)}
+.sets li:first-child{border-top:0}
+.sets .nm{font-family:var(--mono);font-weight:500;min-width:76px}
+.sets .kd{flex:1 1 140px;min-width:0;color:var(--muted);font-size:.9rem}
+.sets .last{font-family:var(--mono);font-size:.85rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:6px;padding:8px 16px;font-weight:600}
+.btn.ghost{background:none;color:var(--accent);border:1px solid var(--line)}
+.btn:disabled{opacity:.5;cursor:default}
+.note{font-size:.85rem;color:var(--muted);margin:0}
+.warn{background:var(--bad-soft);color:var(--ink);border-radius:6px;padding:10px 12px;font-size:.9rem;margin:0}
+.prog{font-family:var(--mono);font-size:.85rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.bar{height:4px;background:var(--line);border-radius:2px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
+.player{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px}
+.play{width:56px;height:56px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-ink);font-size:1.3rem;display:grid;place-items:center}
+.seekrow{display:flex;align-items:center;gap:12px}
+.seekrow input{flex:1 1 auto;min-width:0;accent-color:var(--accent);padding:0;border:0;background:none}
+.acc{margin:0;font-size:1.05rem}.acc b{font-family:var(--mono);font-weight:500}.acc .note{margin-left:10px}
+.deck{position:sticky;top:env(safe-area-inset-top,0px);z-index:2;display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-block:14px}
+.deck #seek{flex:1 1 180px;min-width:0;accent-color:var(--accent);padding:0;border:0;background:none}
+.deck select{width:auto}
+.sheet{background:var(--panel);border-radius:10px;overflow:hidden;border:1px solid var(--line);margin-bottom:16px}
+.shead{background:var(--ink);color:var(--panel);padding:10px 14px;font-size:.85rem;font-weight:600}
+.srow{display:grid;grid-template-columns:36px 40px minmax(0,1fr) 56px;align-items:start;gap:4px 10px;padding:14px 14px 12px;border-top:1px solid var(--line)}
+.srow.on{background:var(--accent-soft)}
+.srow .num{font-family:var(--mono);font-weight:500;padding-top:8px;text-align:center;font-variant-numeric:tabular-nums}
+.spk{background:none;border:0;color:var(--accent);padding:6px;border-radius:6px;display:grid;place-items:center}
+.spk:hover{background:var(--accent-soft)}
+.cell{display:flex;flex-direction:column;gap:6px;min-width:0}
+.line{font-family:var(--mono);background:var(--panel)!important}
+.line[readonly],.blank[readonly]{color:var(--muted)}
+.srow .cloze{margin:0}
+.ansline{margin:0;color:var(--bad);font-weight:500;overflow-wrap:anywhere;-webkit-user-select:none;user-select:none}
+.ansline .ok{color:var(--bad)}.ansline .miss{background:var(--bad-soft);text-decoration:underline;text-underline-offset:3px}
+.rp{font-family:var(--mono);padding-top:8px;text-align:right;font-variant-numeric:tabular-nums}.rp.full{color:var(--good)}
+@media(max-width:480px){.srow{grid-template-columns:24px 36px minmax(0,1fr);}.rp{grid-column:3;text-align:left;padding-top:0}}
+.cloze{font-size:1.05rem;line-height:2.4}
+.blank{border:0;border-bottom:2px solid var(--accent);background:var(--accent-soft);border-radius:4px 4px 0 0;padding:2px 6px;font-size:1rem;color:var(--ink);max-width:100%}
+.fb{border-top:1px solid var(--line);padding-top:14px;display:flex;flex-direction:column;gap:8px}
+.fb .lab{font-size:.75rem;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.sent{font-family:var(--mono);font-size:1rem;line-height:1.8;margin:0;overflow-wrap:anywhere}
+.ok{color:var(--good)} .miss{background:var(--bad-soft);color:var(--bad);border-radius:3px;padding:0 2px}
+.x{color:var(--bad);text-decoration:line-through}
+.score{font-family:var(--mono);font-weight:500;font-variant-numeric:tabular-nums}
+.pill{display:inline-block;font-family:var(--mono);font-size:.8rem;padding:1px 8px;border-radius:99px;background:var(--good-soft);color:var(--good);font-variant-numeric:tabular-nums}
+.pill.lo{background:var(--bad-soft);color:var(--bad)}
+.big{font-family:var(--mono);font-size:2.4rem;font-weight:500;line-height:1}
+.tblw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:.75rem;letter-spacing:.06em;color:var(--muted);font-weight:600;white-space:nowrap}
+td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.run{cursor:pointer} tr.run:hover td{background:var(--accent-soft)}
+.det{display:flex;flex-direction:column;gap:10px;padding:4px 0 8px}
+.det div{display:flex;flex-direction:column;gap:2px}
+kbd{font-family:var(--mono);font-size:.8rem;border:1px solid var(--line);border-radius:4px;padding:0 5px;background:var(--bg)}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <h1>딕테이션</h1>
+  </header>
+  <main id="app"></main>
+</div>
+
+<script src="classes.js"></script>
+<script>
+/* 구글 Apps Script 웹 앱 주소. 문장·정답은 구글 시트에만 있고, 채점도 그쪽에서 합니다. */
+const SHEET_URL="https://script.google.com/macros/s/AKfycby2TjxwpDQwk1I6ym7570mVb_TSBfyv4_1YCyDDnbvGJVZZd27CFwklOR_-vXU_uxW3kA/exec";
+
+const $=s=>document.querySelector(s), app=$('#app');
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ls={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const S={view:'home',cat:null,me:(m=>m&&m.period&&m.cls&&m.name&&m.code?m:null)(ls.get('dict.me',null)),mode:ls.get('dict.mode','full'),rate:ls.get('dict.rate',1),book:ls.get('dict.book',''),test:ls.get('dict.test',''),reps:Math.min(5,Math.max(1,+ls.get('dict.reps',1)||1)),last:ls.get('dict.last',{}),
+  set:null,i:0,res:[],plays:0,graded:null,saved:null};
+
+// 책·테스트·세트 목록은 입장 후 서버에서 받습니다 (S.cat). 문장은 세트를 시작할 때 받습니다.
+const B=()=>S.cat.find(b=>b.id===S.book)||S.cat[0];
+const inBook=()=>B().tests;
+const T=()=>inBook().find(t=>t.id===S.test)||inBook()[0];
+const lastKey=st=>T().id+'.'+st.id+'.'+S.mode;
+
+// 구글 시트(Apps Script)와 통신. 응답은 JSON {ok, ...}. 학생 요청에는 입장 코드를 붙입니다.
+async function api(body){
+  const r=await fetch(SHEET_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({code:S.me&&S.me.code},body))});
+  return r.json();
+}
+// 입장 코드가 바뀌었으면 다시 입력하게
+function codeFail(r){if(r&&(r.error==='code'||r.error==='nocode')){const n=S.me&&S.me.name;S.cat=null;S.me=null;ls.set('dict.me',null);S.loginErr=r.error==='nocode'?'선생님이 아직 입장 코드를 정하지 않았어요.':'입장 코드가 바뀌었어요. 선생님께 새 코드를 물어보세요.';S.lastName=n;S.view='home';render();return true}return false}
+const who=()=>S.me?`${S.me.period} · ${S.me.cls} · ${S.me.name}`:'';
+
+/* ---------- scoring (채점은 서버에서) ---------- */
+const pct=(h,t)=>t?Math.round(100*h/t):0;
+const pill=p=>`<span class="pill ${p<70?'lo':''}">${p}%</span>`;
+
+/* ---------- audio ---------- */
+const audio=new Audio();let blobTried=false;
+audio.addEventListener('error',async()=>{ if(blobTried||!audio.dataset.rel)return;blobTried=true;
+  try{const r=await fetch(audio.dataset.rel);audio.src=URL.createObjectURL(await r.blob());audio.playbackRate=S.rate;audio.play().catch(()=>{})}catch(e){}});
+const clip=()=>{const it=S.set&&S.cur>=0?S.set.items[S.cur]:null;return {st:it&&it.st||0,en:it&&it.en||0}};
+const mmss=t=>{t=isFinite(t)?Math.max(0,t):0;return Math.floor(t/60)+':'+String(Math.floor(t%60)).padStart(2,'0')};
+function tick(){const s=$('#seek'),t=$('#time');if(!s)return;const c=clip(),end=c.en||audio.duration,d=end-c.st,now=Math.max(0,audio.currentTime-c.st);
+  if(!s.matches(':active'))s.value=isFinite(d)&&d>0?Math.round(1000*now/d):0;
+  t.textContent=mmss(now)+' / '+mmss(d)}
+// 음성이 늦게 로드되면 앞서 지정한 시작 위치가 무시되므로, 로드 후 다시 맞춤
+audio.addEventListener('loadedmetadata',()=>{const c=clip();if(c.st&&audio.currentTime<c.st-0.05){try{audio.currentTime=c.st}catch(e){}}});
+// 재생 구간(en)이 있으면 그 지점에서 멈추고 '끝난' 것으로 처리
+audio.addEventListener('timeupdate',()=>{const c=clip();if(c.st&&!audio.paused&&audio.currentTime<c.st-0.3){try{audio.currentTime=c.st}catch(e){}return}if(c.en&&!audio.paused&&audio.currentTime>=c.en){audio.pause();audio.dispatchEvent(new Event('ended'))}});
+['timeupdate','loadedmetadata','durationchange','ended','seeked'].forEach(ev=>audio.addEventListener(ev,tick));
+function load(src){blobTried=false;audio.pause();audio.dataset.rel=src;audio.src=src}
+function play(){audio.playbackRate=S.rate;try{audio.currentTime=0}catch(e){}audio.play().catch(()=>{});S.plays++;const c=$('#plays');if(c)c.textContent=S.plays+'회 들음'}
+
+/* ---------- views ---------- */
+function render(){({home,run})[S.view]();}
+// 입장한 뒤 목록을 아직 못 받았으면 받아 옴
+async function loadCat(){
+  app.innerHTML='<section class="panel"><p class="note">문제 목록을 불러오는 중입니다…</p></section>';
+  try{const r=await api({action:'catalog'});if(codeFail(r))return;if(!r.ok)throw 0;S.cat=r.books;
+    if(!S.cat.length){app.innerHTML='<section class="panel"><p class="warn">아직 올라온 문제가 없습니다. 선생님께 알려 주세요.</p></section>';return}render()}
+  catch(e){app.innerHTML='<section class="panel"><p class="warn">문제 목록을 불러오지 못했습니다. 인터넷 연결을 확인하세요.</p><div class="row"><button class="btn" id="again">다시 시도</button></div></section>';$('#again').onclick=loadCat}
+}
+// 기간 → 반 선택 → 이름 입력. 반 목록은 classes.js
+function login(){
+  const nowTitle=(d=>`${d.getFullYear()}년 ${d.getMonth()+1}월`)(new Date());
+  const pi=Math.max(0,PERIODS.findIndex(p=>p.title===(S.pickPeriod||nowTitle))),per=PERIODS[pi];
+  app.innerHTML=`<section class="panel" style="max-width:420px;width:100%;margin:0 auto">
+    <h2>시작하기</h2>
+    <label class="f" for="per">기간<select id="per">${PERIODS.map((p,i)=>`<option value="${i}" ${i===pi?'selected':''}>${esc(p.title)}</option>`).join('')}</select></label>
+    <label class="f" for="cls">반<select id="cls"><option value="">반을 선택하세요</option>${per.groups.map((g,gi)=>`<optgroup label="${esc(g.name)}">${
+      g.classes.map((c,ci)=>`<option value="${gi}.${ci}">${esc(g.name+' '+c)}</option>`).join('')}</optgroup>`).join('')}</select></label>
+    <label class="f" for="nm">이름<input type="text" id="nm" maxlength="20" placeholder="예: 김민서" autocomplete="off" value="${esc(S.lastName||'')}"></label>
+    <label class="f" for="code">입장 코드<input type="text" id="code" maxlength="30" placeholder="선생님이 알려 준 코드" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+    <p class="warn" id="lerr" ${S.loginErr?'':'hidden'}>${esc(S.loginErr||'')}</p>
+    <button class="btn" id="enter">시작</button>
+  </section>`;
+  $('#per').onchange=e=>{S.pickPeriod=PERIODS[+e.target.value].title;login()};
+  const go=async()=>{const v=$('#cls').value,name=$('#nm').value.trim().replace(/\s+/g,' '),code=$('#code').value.trim(),er=$('#lerr'),bt=$('#enter');
+    const err=m=>{er.textContent=m;er.hidden=false};
+    if(!v)return err('반을 선택하세요.');
+    if(!name){$('#nm').focus();return err('이름을 입력하세요.')}
+    if(!code){$('#code').focus();return err('입장 코드를 입력하세요.')}
+    const [gi,ci]=v.split('.').map(Number),g=per.groups[gi];
+    bt.disabled=true;bt.textContent='확인 중…';
+    try{const r=await fetch(SHEET_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'catalog',code})}).then(x=>x.json());
+      if(!r.ok){bt.disabled=false;bt.textContent='시작';return err(r.error==='nocode'?'선생님이 아직 입장 코드를 정하지 않았어요.':r.error==='code'?'입장 코드가 맞지 않아요.':'잠시 후 다시 시도하세요.')}
+      S.cat=r.books;S.loginErr='';S.me={period:per.title,cls:g.name+' '+g.classes[ci],name,code};ls.set('dict.me',S.me);render()}
+    catch(e){bt.disabled=false;bt.textContent='시작';err('서버에 연결하지 못했습니다. 인터넷 연결을 확인하세요.')}};
+  $('#enter').onclick=go;['nm','code'].forEach(id=>$('#'+id).addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing)go()}));
+}
+function home(){
+  if(!S.me)return login();
+  if(!S.cat)return loadCat();
+  if(!S.cat.length)return;
+  app.innerHTML=`<section class="panel">
+    <div class="row">
+      <label class="f" for="book" style="flex:0 1 180px">책
+        <select id="book">${S.cat.map(b=>`<option value="${esc(b.id)}" ${b.id===B().id?'selected':''}>${esc(b.title)}</option>`).join('')}</select></label>
+      <label class="f" for="test" style="flex:0 1 220px">테스트
+        <select id="test">${[...new Set(inBook().map(t=>t.title))].map(g=>`<optgroup label="${esc(g)}">${inBook().filter(t=>t.title===g).map(t=>`<option value="${esc(t.id)}" ${t.id===T().id?'selected':''}>${esc(t.title+(t.sub?' · '+t.sub:''))}</option>`).join('')}</optgroup>`).join('')}</select></label>
+      <div class="f"><span>학생</span><span class="row" style="gap:8px;color:var(--ink);padding:8px 0"><b>${esc(who())}</b><button class="btn ghost" id="logout" type="button" style="padding:2px 10px">바꾸기</button></span></div>
+      <div><div class="note" style="margin-bottom:4px">방식</div>
+        <div class="seg" id="mode"><button data-m="full" aria-pressed="${S.mode==='full'}">전체 받아쓰기</button><button data-m="blank" aria-pressed="${S.mode==='blank'}">빈칸 받아쓰기</button></div></div>
+      <label class="f" for="reps" style="flex:0 0 auto">문장당 듣기
+        <select id="reps">${[1,2,3,4,5].map(n=>`<option value="${n}" ${S.reps===n?'selected':''}>${n}번</option>`).join('')}</select></label>
+    </div>
+    <p class="note">한 문장씩 듣고 씁니다. 각 문장은 정한 횟수만큼 반복해서 나옵니다. 들은 횟수, 답, 걸린 시간이 선생님께 기록되고, 같은 세트를 다시 풀면 몇 번째 제출인지 함께 기록됩니다. 붙여넣기는 할 수 없습니다.</p>
+    <ul class="sets">${T().sets.map(s=>{const l=S.last[lastKey(s)];return `<li><span class="nm">${s.title}</span><span class="kd">${s.name?esc(s.name)+' · ':''}${s.kind} · ${s.n}문장</span>
+      <span class="last">${l!=null?'지난 점수 '+l+'%':''}</span><button class="btn" data-set="${s.id}">시작</button></li>`}).join('')}</ul>
+  </section>`;
+  $('#logout').addEventListener('click',()=>{S.lastName=S.me.name;S.me=null;ls.set('dict.me',null);render()});
+  $('#mode').addEventListener('click',e=>{const m=e.target.dataset.m;if(!m)return;S.mode=m;ls.set('dict.mode',m);home()});
+  $('#book').addEventListener('change',e=>{S.book=e.target.value;ls.set('dict.book',S.book);S.test='';render()});
+  $('#test').addEventListener('change',e=>{S.test=e.target.value;ls.set('dict.test',S.test);render()});
+  $('#reps').addEventListener('change',e=>{S.reps=+e.target.value;ls.set('dict.reps',S.reps)});
+  app.querySelectorAll('[data-set]').forEach(b=>b.addEventListener('click',()=>{
+    const st=T().sets.find(s=>s.id===b.dataset.set);
+    if(S.last[lastKey(st)]!=null&&!confirm('이미 푼 세트예요.\n다시 풀면 선생님 기록에 몇 번째 제출인지 함께 표시돼요.\n그래도 다시 풀까요?'))return;
+    b.disabled=true;b.textContent='불러오는 중…';
+    Promise.all([api({action:'set',test:T().id,set:st.id,mode:S.mode}),api({action:'audio',test:T().id,set:st.id})]).then(([r,au])=>{
+      if(codeFail(r)||codeFail(au))return;if(!r.ok||!au.ok)throw au&&au.error==='noaudio'?'noaudio':0;
+      S.set=Object.assign({},st,{items:withAudio(r.items,au.pack)});S.res=[];S.saved=null;S.view='run';startItem()})
+    .catch(e=>{b.disabled=false;b.textContent='시작';alert(e==='noaudio'?'이 세트는 아직 음성이 올라오지 않았습니다. 선생님께 알려 주세요.':'문제를 불러오지 못했습니다. 인터넷 연결을 확인하고 다시 눌러 주세요.')});}));
+}
+// 서버에서 받은 세트 음성 묶음({clips:{이름:base64}, type})을 브라우저 안의 음성 주소로 바꿔 문장마다 붙임
+function withAudio(items,pack){
+  (S.urls||[]).forEach(u=>URL.revokeObjectURL(u));S.urls=[];const made={};
+  return items.map(it=>{const b64=pack.clips[it.src];if(b64&&!made[it.src]){const s=atob(b64),a=new Uint8Array(s.length);for(let i=0;i<s.length;i++)a[i]=s.charCodeAt(i);
+    made[it.src]=URL.createObjectURL(new Blob([a],{type:pack.type||'audio/mp4'}));S.urls.push(made[it.src])}
+    return Object.assign({},it,{src:made[it.src]||''})});
+}
+const SPK='<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3l4.5-3.5v12L7 14.5H4z"/><path d="M15 9.5a3.5 3.5 0 0 1 0 5"/><path d="M17.5 7a7 7 0 0 1 0 10"/></svg>';
+// 제출: 아직 안 넘긴 문장까지 답을 모아 서버로 보내고, 서버가 채점한 점수와 정답을 보여 줌
+function submitAll(){if(S.submitted)return;S.submitted=true;S.secs=Math.round((Date.now()-S.t0)/1000);clearInterval(S.timer);S.left=0;clearTimeout(S.again);stopWait();clock();
+  S.rows.forEach((r,k)=>{if(r.a==null)lockRow(k)});audio.pause();$('#seek').disabled=false;finish()}
+function startItem(){S.submitted=false;S.t0=Date.now();S.secs=0;clearInterval(S.timer);S.timer=setInterval(clock,1000);S.rows=S.set.items.map(()=>({plays:0,a:null,s:null}));S.cur=-1;audio.pause();render();playRow(0)}
+function clock(){const el=$('#elapsed');if(!el)return;const t=S.submitted?S.secs:Math.round((Date.now()-S.t0)/1000);el.textContent=(S.submitted?'걸린 시간 : ':'경과 ')+mmss(t)}
+// 지금까지 넘어간 문장들의 평균 (풀이 중 표시용)
+function accSoFar(){const g=S.rows.filter(r=>r.s!=null);return g.length?Math.round(g.reduce((a,r)=>a+r.s,0)/g.length):0}
+function run(){
+  const items=S.set.items;
+  app.innerHTML=`<p class="acc"><span class="prog" id="elapsed">경과 0:00</span></p><p class="acc">정확도(유사도) : <b id="acc">문장을 넘기면 표시됩니다</b> <span class="note">${S.set.title}${S.set.name?' · '+esc(S.set.name):''} · ${S.set.kind} · ${S.mode==='full'?'전체 받아쓰기':'빈칸 받아쓰기'}</span></p>
+  <p class="warn" id="nopaste" hidden>붙여넣기는 할 수 없어요. 들은 대로 직접 쳐 주세요.</p>
+  <div class="deck">
+    <span class="prog" id="now">1번부터 자동으로 재생됩니다</span>
+    <input type="range" id="seek" min="0" max="1000" value="0" aria-label="재생 위치" disabled>
+    <span class="prog" id="time">0:00 / 0:00</span>
+    <select id="rate" aria-label="재생 속도">${[0.75,0.9,1,1.15].map(r=>`<option value="${r}" ${r==S.rate?'selected':''}>${r}x</option>`).join('')}</select>
+    <span class="prog" id="wait" aria-live="polite"></span>
+    <button class="btn ghost" id="skip">다음 문장 (Tab)</button>
+  </div>
+  <section class="sheet">
+    <div class="shead"><span>번호</span></div>
+    ${items.map((it,k)=>`<div class="srow" id="r${k}">
+      <span class="num">${k+1}</span>
+      <button class="spk" data-k="${k}" aria-label="${k+1}번 듣기">${SPK}</button>
+      <div class="cell">${S.mode==='full'
+        ?`<input type="text" class="line" id="in${k}" data-k="${k}" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="${k+1}번 받아쓰기">`
+        :`<p class="cloze">${it.c.map((p,j)=>p.x!=null?esc(p.x):`<input class="blank" id="b${k}_${j}" data-k="${k}" spellcheck="false" autocomplete="off" autocapitalize="off" size="${Math.max(6,p.n+2)}" aria-label="${k+1}번 빈칸">`).join('')}</p>`}
+        <p class="ansline" id="fb${k}" hidden></p></div>
+      <span class="rp" id="p${k}"></span>
+    </div>`).join('')}
+  </section>
+  <p class="note" id="savemsg" hidden></p>
+  <div class="row" style="justify-content:space-between" id="foot">
+    <span class="note">문장마다 ${S.reps}번 들려주고 자동으로 다음 문장으로 넘어갑니다 · <kbd>Tab</kbd> 바로 다음 문장 · 넘어간 문장은 고칠 수 없습니다</span>
+    <span class="row"><button class="btn ghost" id="quit">그만하기</button><button class="btn" id="go">제출하고 결과 보기</button></span>
+  </div>`;
+  app.querySelectorAll('.spk').forEach(b=>b.onclick=()=>{const k=+b.dataset.k;if(S.submitted)return review(k);if(k===S.cur)replay()});
+  app.querySelectorAll('.line,.blank').forEach(i=>i.addEventListener('focus',()=>{S.focusK=+i.dataset.k}));
+  $('#rate').onchange=e=>{S.rate=+e.target.value;ls.set('dict.rate',S.rate);audio.playbackRate=S.rate};
+  $('#seek').oninput=e=>{const c=clip(),d=(c.en||audio.duration)-c.st;if(isFinite(d)&&d>0){try{audio.currentTime=c.st+d*e.target.value/1000}catch(x){}}};
+  $('#skip').onclick=next;
+  $('#go').onclick=submitAll;
+  $('#quit').onclick=()=>{clearInterval(S.timer);S.left=0;clearTimeout(S.again);stopWait();audio.pause();S.view='home';render()};
+  tick();clock();
+}
+function focusRow(k){const a=$('#in'+k)||app.querySelector('#r'+k+' .blank');if(a&&!a.readOnly)a.focus({preventScroll:false})}
+function playOnce(k){
+  if(!S.submitted)S.rows[k].plays++;
+  const left=S.submitted?0:S.reps-S.rows[k].plays;
+  $('#now').textContent=(k+1)+'번 · '+S.rows[k].plays+'회 들음'+(left>0?' · '+left+'번 더 나옵니다':'');
+  audio.playbackRate=S.rate;try{audio.currentTime=clip().st}catch(e){}audio.play().catch(()=>{});
+}
+// 풀이 중: 정한 횟수만큼 반복 → 받아 쓸 시간 → 자동으로 다음 문장
+audio.addEventListener('ended',()=>{
+  if(S.view!=='run'||S.submitted||S.cur<0)return;const k=S.cur;
+  if(S.rows[k].plays<S.reps){
+    // 반복 사이 간격: 문장 길이의 절반, 최소 2초 · 최대 4초
+    const c=clip(),d=(c.en||audio.duration||3)-c.st;let t=Math.min(4,Math.max(2,Math.round(d*0.5)));
+    const show=()=>{$('#wait').textContent='다시 듣기까지 '+t+'초'};show();clearInterval(S.waitT);
+    S.waitT=setInterval(()=>{if(S.view!=='run'||S.submitted||S.cur!==k){stopWait();return}t--;if(t<=0){stopWait();if(S.rows[k].plays<S.reps)playOnce(k)}else show()},1000);
+    return}
+  startWait(k);
+});
+function stopWait(){clearInterval(S.waitT);S.waitT=null;const w=$('#wait');if(w)w.textContent=''}
+function startWait(k){
+  stopWait();const c=clip(),d=(c.en||audio.duration||3)-c.st;
+  if(k+1>=S.rows.length){$('#wait').textContent='마지막 문장입니다. 다 쓰면 「제출하고 결과 보기」를 누르세요.';return}
+  let t=Math.max(4,Math.ceil(d*1.5)+2);
+  const show=()=>{$('#wait').textContent='다음 문장까지 '+t+'초'};show();
+  S.waitT=setInterval(()=>{if(S.view!=='run'||S.submitted||S.cur!==k)return stopWait();t--;if(t<=0){stopWait();next()}else show()},1000);
+}
+// 지금 문장을 잠그고 점수만 보여 준 뒤 다음 문장으로
+function next(){if(S.submitted)return;const k=S.cur;if(k+1>=S.rows.length)return;if(k>=0&&S.rows[k].a==null){lockRow(k);gradeRow(k)}playRow(k+1)}
+// Enter·스피커: 남은 듣기 횟수가 있을 때만 다시 듣기
+function replay(){const k=S.cur;if(k<0||S.submitted)return;
+  if(S.rows[k].plays>=S.reps){$('#now').textContent=(k+1)+'번 · 듣기 횟수('+S.reps+'번)를 다 썼어요';return}
+  clearTimeout(S.again);stopWait();playOnce(k)}
+// 제출 후 복습: 횟수 제한 없이 듣기
+function review(k){if(S.cur!==k){load(S.set.items[k].src);S.cur=k}
+  app.querySelectorAll('.srow.on').forEach(r=>r.classList.remove('on'));$('#r'+k).classList.add('on');
+  S.rows[k];$('#now').textContent=(k+1)+'번 다시 듣기';audio.playbackRate=S.rate;try{audio.currentTime=clip().st}catch(e){}audio.play().catch(()=>{})}
+function playRow(k){
+  if(S.cur!==k){load(S.set.items[k].src);S.cur=k}
+  app.querySelectorAll('.srow.on').forEach(r=>r.classList.remove('on'));$('#r'+k).classList.add('on');
+  clearTimeout(S.again);stopWait();playOnce(k);
+  $('#skip').disabled=k+1>=S.rows.length;focusRow(k);
+}
+// 문장의 답을 모으고 더 못 고치게 잠금
+function lockRow(k){
+  const row=S.rows[k];
+  if(S.mode==='full'){const el=$('#in'+k);row.a=el.value;el.readOnly=true}
+  else row.a=[...$('#r'+k).querySelectorAll('.blank')].map(el=>{el.readOnly=true;return el.value});
+}
+// 넘긴 문장 점수만 서버에서 받아 표시 (정답은 제출 후에)
+async function gradeRow(k){
+  const pc=$('#p'+k);pc.textContent='…';
+  try{const r=await api({action:'grade',test:T().id,set:S.set.id,mode:S.mode,k,a:S.rows[k].a});if(codeFail(r))return;if(!r.ok)throw 0;
+    if(S.submitted)return;S.rows[k].s=r.s;showScore(k);$('#acc').textContent=accSoFar()+'%'}
+  catch(e){if(!S.submitted)pc.textContent='–'}
+}
+function showScore(k){const p=S.rows[k].s,pc=$('#p'+k);if(!pc||p==null)return;pc.textContent=p+'%';pc.classList.toggle('full',p===100)}
+function reveal(k,html){const fb=$('#fb'+k);if(!html||!fb)return;fb.innerHTML=html;fb.hidden=false}
+// 붙여넣기·끌어다 놓기·복사 막기 (정답을 베껴 넣지 못하게)
+['paste','drop'].forEach(t=>document.addEventListener(t,e=>{if(S.view!=='run'||!e.target.matches||!e.target.matches('.line,.blank'))return;
+  e.preventDefault();const m=$('#nopaste');if(!m)return;m.hidden=false;clearTimeout(S.pasteT);S.pasteT=setTimeout(()=>{m.hidden=true},3000)},true));
+['copy','cut'].forEach(t=>document.addEventListener(t,e=>{if(S.view==='run')e.preventDefault()},true));
+// Enter: 남은 횟수 안에서 다시 듣기 · Tab: 바로 다음 문장 (이전 문장으로는 돌아갈 수 없음)
+document.addEventListener('keydown',e=>{
+  if(S.view!=='run'||S.submitted||e.isComposing||(e.key!=='Tab'&&e.key!=='Enter'))return;
+  const el=e.target;if(!el||!el.matches||!el.matches('.line,.blank'))return;
+  const k=+el.dataset.k;
+  if(e.key==='Enter'){e.preventDefault();if(k===S.cur)replay();return}
+  // 빈칸 모드에서 같은 문장에 빈칸이 더 있으면 기본 Tab 이동
+  const bl=[...$('#r'+k).querySelectorAll('.blank')],j=bl.indexOf(el);
+  if(j>=0&&(e.shiftKey?j>0:j<bl.length-1))return;
+  e.preventDefault();if(!e.shiftKey&&k===S.cur)next();
+});
+async function finish(){
+  const MSG={saving:'채점하고 기록을 보내는 중입니다…',ok:'선생님께 기록이 전송되었습니다.',fail:'제출하지 못했습니다. 인터넷 연결을 확인하고 「다시 제출」을 눌러 주세요.',auth:'반이나 이름 정보가 없어 기록이 저장되지 않았습니다. 「바꾸기」를 눌러 다시 들어오세요.'};
+  const show=()=>{const m=$('#savemsg');if(!m||S.view!=='run')return;m.hidden=false;m.textContent=MSG[S.saved];m.className=(S.saved==='ok'||S.saved==='saving')?'note':'warn'};
+  S.saved='saving';show();$('#acc').textContent='채점 중…';
+  $('#foot').innerHTML='<span class="note">채점 중입니다…</span>';window.scrollTo({top:0,behavior:'smooth'});
+  const rec={action:'submit',period:S.me.period,cls:S.me.cls,stu:S.me.name,test:T().id,set:S.set.id,mode:S.mode,secs:S.secs,reps:S.reps,
+    items:S.rows.map(r=>({a:r.a,p:r.plays}))};
+  let r;
+  try{r=await api(rec);if(codeFail(r))return;S.saved=r.ok?'ok':r.error==='auth'?'auth':'fail'}catch(e){S.saved='fail'}
+  if(S.view!=='run')return;
+  if(S.saved!=='ok'){show();$('#acc').textContent='–';
+    $('#foot').innerHTML='<span class="note">답은 그대로 남아 있습니다.</span><button class="btn" id="resend">다시 제출</button>';$('#resend').onclick=finish;return}
+  S.score=r.score;S.last[lastKey(S.set)]=r.score;ls.set('dict.last',S.last);
+  r.items.forEach((x,k)=>{S.rows[k].s=x.s;showScore(k);reveal(k,x.html)});
+  $('#acc').textContent=r.score+'%';show();
+  $('#foot').innerHTML=`<span class="note">${r.showAnswers?'스피커를 눌러 다시 들으며 정답을 확인할 수 있습니다.':'스피커를 눌러 다시 들을 수 있습니다.'}</span><button class="btn" id="back">다른 세트 풀기</button>`;
+  $('#back').onclick=()=>{audio.pause();S.view='home';render()};
+}
+
+render();
+</script>
+
+</body></html>

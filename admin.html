@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>딕테이션 관리자</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: filter bar on top, tabs below, one working table per tab; student detail opens under the table. */
+:root{
+  --bg:#f2f5f6;--panel:#fff;--ink:#16242b;--muted:#5b6d75;--line:#d5dee2;
+  --accent:#0d6570;--accent-ink:#fff;--accent-soft:#dcedef;
+  --good:#1c7a45;--good-soft:#dff1e6;--mid:#9a5b00;--mid-soft:#fbefd9;--bad:#b3362b;--bad-soft:#f8e2df;
+  --sans:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;--mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#10181b;--panel:#182327;--ink:#e6eef0;--muted:#93a6ad;--line:#2c3b41;
+  --accent:#5cc2cd;--accent-ink:#06282d;--accent-soft:#1d3a3f;
+  --good:#6fd49a;--good-soft:#173524;--mid:#f0b45a;--mid-soft:#3b2c12;--bad:#f08b80;--bad-soft:#40201c;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55}
+.wrap{max-width:1100px;margin:0 auto;padding:24px 16px 64px;display:flex;flex-direction:column;gap:16px}
+h1{font-size:1.4rem;margin:0}
+h2{font-size:1.05rem;margin:0}
+p{margin:0}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 10px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px}
+label.f{display:flex;flex-direction:column;gap:3px;font-size:.8rem;color:var(--muted)}
+.btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:6px;padding:8px 16px;font-weight:600}
+.btn.ghost{background:none;color:var(--accent);border:1px solid var(--line)}
+.note{font-size:.85rem;color:var(--muted)}
+.warn{background:var(--bad-soft);border-radius:6px;padding:10px 12px;font-size:.9rem}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+.tab{background:none;border:0;border-bottom:2px solid transparent;padding:8px 14px;color:var(--muted);font-weight:500}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:.75rem;letter-spacing:.05em;color:var(--muted);font-weight:600;white-space:nowrap}
+td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.click{cursor:pointer}
+tr.click:hover td,tr.sel td{background:var(--accent-soft)}
+.pill{display:inline-block;font-family:var(--mono);font-size:.8rem;padding:1px 8px;border-radius:99px;font-variant-numeric:tabular-nums}
+.p-good{background:var(--good-soft);color:var(--good)}.p-mid{background:var(--mid-soft);color:var(--mid)}.p-bad{background:var(--bad-soft);color:var(--bad)}
+.stat{display:flex;gap:10px;flex-wrap:wrap}
+.strip{display:flex;flex-wrap:nowrap;width:max-content;gap:2px}
+.strip i{flex:none;width:9px;height:14px;border-radius:2px;background:var(--line)}
+.strip i.d1{background:var(--accent-soft);outline:1px solid var(--accent)}.strip i.d2{background:var(--accent)}
+tr.day td{background:var(--bg);font-weight:600}
+tr.day td .note{font-weight:400}
+.stat div{background:var(--bg);border-radius:8px;padding:8px 14px;display:flex;flex-direction:column}
+.stat b{font-family:var(--mono);font-size:1.25rem;font-weight:500}
+.stat span{font-size:.75rem;color:var(--muted)}
+.sent{font-family:var(--mono);font-size:.86rem;overflow-wrap:anywhere}
+.ans{color:var(--muted)}
+.empty{color:var(--muted);padding:18px 4px}
+.login{max-width:380px;margin:60px auto 0}
+.days{display:flex;flex-wrap:wrap;gap:6px}
+.dchip{display:inline-flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:3px 10px;font-size:.82rem}
+.dchip b{font-family:var(--mono);font-weight:500;color:var(--accent)}
+.dchip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.dchip[aria-pressed="true"] b{color:var(--accent-ink)}
+</style></head><body>
+<div class="wrap" id="app"></div>
+<script src="classes.js"></script>
+<script>
+/* 학생 사이트(index.html)와 같은 Apps Script 주소 */
+const SHEET_URL="https://script.google.com/macros/s/AKfycby2TjxwpDQwk1I6ym7570mVb_TSBfyv4_1YCyDDnbvGJVZZd27CFwklOR_-vXU_uxW3kA/exec";
+const $=s=>document.querySelector(s),app=$('#app');
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ss={get(k){try{return sessionStorage.getItem(k)}catch(e){return null}},set(k,v){try{v==null?sessionStorage.removeItem(k):sessionStorage.setItem(k,v)}catch(e){}}};
+const A={books:[],settings:null,hwBook:'',key:ss.get('admin.key'),rec:null,det:null,tab:'students',period:'',cls:'',q:'',from:'',to:'',hideTest:true,open:null,openRun:null,hwTest:'',err:''};
+
+/* ---------- data ---------- */
+// 기록: [일시,기간,반,이름,시험,세트,유형,방식,총점,걸린시간,초,문장당듣기,평균들은횟수]
+// 문장별: [일시,기간,반,이름,시험,세트,방식,번호,정답,학생답,점수,들은횟수]
+// 구글 시트가 「2026년 10월」, 「2-01」 같은 글자를 날짜로 바꿔 저장한 경우 원래 글자로 되돌림
+const ISO=/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
+const asPeriod=v=>{v=String(v);if(!ISO.test(v))return v;const d=new Date(v);return `${d.getFullYear()}년 ${d.getMonth()+1}월`};
+const asSet=v=>{v=String(v);if(!ISO.test(v))return v;const d=new Date(v);return `${d.getMonth()+1}-${String(d.getDate()).padStart(2,'0')} 세트`};
+const nk=s=>String(s).replace(/\s+/g,'');
+// 시험 이름: 「책 · TEST n · MODULE n」. 책 이름이 없는 예전 기록은 첫 번째 책으로 봅니다.
+// 책·테스트 목록은 서버(구글 시트 「문제」 탭)에서 받습니다 (A.books).
+const OLD_BOOK='NEW TOEFL 2'; // 책 구분이 생기기 전 기록은 이 책
+const tname=(b,t)=>b.title+' · '+t.title+(t.sub?' · '+t.sub:'');
+// 책 이름을 바꾼 경우(aka에 예전 이름)도 지금 이름으로 맞춤
+const asTest=v=>{v=String(v);return /^TEST \d/.test(v)?OLD_BOOK+' · '+v:v};
+async function load(){
+  A.err='';render();
+  try{
+    const r=await fetch(SHEET_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'admin',key:A.key})});
+    const j=await r.json();
+    if(!j.ok){A.err={wrong:'비밀번호가 맞지 않습니다.',locked:'비밀번호를 여러 번 틀려서 10분 동안 잠겼습니다. 잠시 후 다시 시도하세요.',nokey:'구글 시트에 관리자 비밀번호(ADMIN_KEY)가 아직 설정되지 않았습니다.',action:'구글 시트 코드가 예전 버전입니다. 새 코드로 다시 배포해 주세요.'}[j.error]||'불러오지 못했습니다.';
+      if(j.error==='wrong'||j.error==='locked'){A.key=null;ss.set('admin.key',null)}A.rec=null;render();return}
+    A.rec=j.records.map(r=>({at:r[0],period:asPeriod(r[1]),cls:String(r[2]),name:String(r[3]),test:asTest(r[4]),set:asSet(r[5]),kind:r[6],mode:r[7],score:+r[8]||0,time:String(r[9]).replace(/^'/,''),secs:+r[10]||0,reps:r[11],plays:r[12]}));
+    A.books=j.books||[];A.settings=j.settings||null;
+    A.det=j.details.map(r=>({at:r[0],cls:String(r[2]),name:String(r[3]),test:asTest(r[4]),set:asSet(r[5]),n:r[7],t:r[8],a:r[9],s:+r[10]||0,p:r[11]}));
+    // 같은 학생이 같은 세트를 몇 번째로 풀었는지 (정답을 본 뒤 다시 푼 기록을 가려내기 위해, 방식과 상관없이)
+    const seen={};A.rec.slice().sort((a,b)=>a.at<b.at?-1:1).forEach(r=>{const k=[r.cls,nk(r.name),r.test,r.set].join('|');r.try=seen[k]=(seen[k]||0)+1});
+    if(!A.period){const ps=[...new Set(A.rec.map(r=>r.period))];A.period=ps.includes(PERIODS[0].title)?PERIODS[0].title:(ps[0]||'')}
+  }catch(e){A.err='연결에 실패했습니다. 인터넷 연결을 확인하고 다시 시도하세요.'}
+  render();
+}
+const isTest=r=>/테스트|확인용/.test(r.name);
+const dkey=iso=>{const d=new Date(iso);return isNaN(d)?'':`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
+const mlabel=m=>{const [y,mo]=m.split('-');return `${y}년 ${+mo}월`};
+const dlabel=k=>{const d=new Date(k+'T00:00');return `${d.getMonth()+1}/${d.getDate()} (${'일월화수목금토'[d.getDay()]})`};
+const inDate=r=>{const k=dkey(r.at);return (!A.from||k>=A.from)&&(!A.to||k<=A.to)};
+const today=()=>dkey(new Date().toISOString());
+const addDays=(k,n)=>{const d=new Date(k+'T12:00');d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
+function recs(){return (A.rec||[]).filter(r=>inDate(r)&&(!A.period||r.period===A.period)&&(!A.cls||r.cls===A.cls)&&(!A.hideTest||!isTest(r))&&(!A.q||nk(r.name).includes(nk(A.q))))}
+function students(list){
+  const m=new Map();
+  list.forEach(r=>{const k=r.cls+'|'+nk(r.name);if(!m.has(k))m.set(k,{k,cls:r.cls,name:r.name,names:new Set(),runs:[]});const s=m.get(k);s.names.add(r.name);s.runs.push(r)});
+  return [...m.values()].map(s=>{s.runs.sort((a,b)=>a.at<b.at?1:-1);s.n=s.runs.length;s.avg=Math.round(s.runs.reduce((a,r)=>a+r.score,0)/s.n);s.last=s.runs[0];s.secs=s.runs.reduce((a,r)=>a+r.secs,0);return s})
+    .sort((a,b)=>a.cls.localeCompare(b.cls,'ko')||a.name.localeCompare(b.name,'ko'));
+}
+const qOn=k=>{const t=today();return k==='today'?A.from===t&&A.to===t:k==='yesterday'?A.from===addDays(t,-1)&&A.to===A.from:k==='week'?A.from===addDays(t,-6)&&A.to===t:!A.from&&!A.to};
+// 같은 세트를 몇 번째로 제출했는지
+const nth=r=>r.try>1?` <span class="pill p-mid">${r.try}번째 제출</span>`:` <span class="note">1번째</span>`;
+const pill=v=>`<span class="pill ${v>=80?'p-good':v>=50?'p-mid':'p-bad'}">${v}%</span>`;
+const fmt=iso=>{const d=new Date(iso);return isNaN(d)?'':`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`};
+const mmss=t=>Math.floor(t/60)+':'+String(Math.round(t%60)).padStart(2,'0');
+const hm=t=>t>=3600?Math.floor(t/3600)+'시간 '+Math.round(t%3600/60)+'분':Math.round(t/60)+'분';
+
+/* ---------- views ---------- */
+function render(){
+  if(!A.key){
+    app.innerHTML=`<section class="panel login"><h1>딕테이션 관리자</h1><p class="note">구글 시트에 설정한 관리자 비밀번호를 입력하세요.</p>
+      <form id="lf" class="row" style="flex-direction:column;align-items:stretch">
+        <input type="password" id="key" autocomplete="current-password" aria-label="관리자 비밀번호">
+        ${A.err?`<p class="warn">${esc(A.err)}</p>`:''}
+        <button class="btn" type="submit">들어가기</button></form></section>`;
+    $('#key').focus();
+    $('#lf').onsubmit=e=>{e.preventDefault();const v=$('#key').value;if(!v)return;A.key=v;ss.set('admin.key',v);load()};
+    return;
+  }
+  if(!A.rec){app.innerHTML=A.err?`<section class="panel"><p class="warn">${esc(A.err)}</p><div class="row"><button class="btn" id="retry">다시 시도</button><button class="btn ghost" id="out">비밀번호 다시 입력</button></div></section>`:'<section class="panel"><p class="note">기록을 불러오는 중입니다…</p></section>';
+    if($('#retry'))$('#retry').onclick=load;if($('#out'))$('#out').onclick=()=>{A.key=null;ss.set('admin.key',null);render()};return}
+  const periods=[...new Set([...PERIODS.map(p=>p.title),...A.rec.map(r=>r.period)])];
+  const per=PERIODS.find(p=>p.title===A.period);
+  const classes=[...new Set([...(per?per.groups.flatMap(g=>g.classes.map(c=>g.name+' '+c)):[]),...A.rec.filter(r=>r.period===A.period).map(r=>r.cls)])];
+  const counts={};A.rec.forEach(r=>{if(r.period===A.period&&(!A.hideTest||!isTest(r)))counts[r.cls]=(counts[r.cls]||0)+1});
+  const base=A.rec.filter(r=>(!A.period||r.period===A.period)&&(!A.cls||r.cls===A.cls)&&(!A.hideTest||!isTest(r)));
+  app.innerHTML=`<div class="top"><h1>딕테이션 관리자</h1><div class="row"><span class="note">기록 ${A.rec.length}건</span><button class="btn ghost" id="reload">새로고침</button><button class="btn ghost" id="out">나가기</button></div></div>
+  <section class="panel"><div class="row">
+    <label class="f">기간<select id="period">${periods.map(p=>`<option ${p===A.period?'selected':''}>${esc(p)}</option>`).join('')}</select></label>
+    <label class="f">반<select id="cls"><option value="">전체 반</option>${classes.map(c=>`<option value="${esc(c)}" ${c===A.cls?'selected':''}>${esc(c)}${counts[c]?` (${counts[c]})`:''}</option>`).join('')}</select></label>
+    <label class="f">시작 날짜<input type="date" id="from" value="${A.from}"></label>
+    <label class="f">끝 날짜<input type="date" id="to" value="${A.to}"></label>
+    <div class="row" style="gap:6px;align-self:flex-end">${[['today','오늘'],['yesterday','어제'],['week','최근 7일'],['all','전체 날짜']].map(([k,l])=>`<button class="dchip" type="button" data-q="${k}" aria-pressed="${qOn(k)}">${l}</button>`).join('')}</div>
+    <form id="sf" class="row" style="gap:6px;align-items:flex-end"><label class="f">학생 검색<input id="q" value="${esc(A.q)}" placeholder="이름"></label><button class="btn" type="submit">검색</button>${A.q?'<button class="btn ghost" type="button" id="qclear">지우기</button>':''}</form>
+    <label class="row note" style="gap:6px;align-self:flex-end;padding-bottom:6px"><input type="checkbox" id="ht" ${A.hideTest?'checked':''}> 테스트 기록 숨기기</label>
+  </div></section>
+  <div class="tabs" role="tablist">${[['students','학생별'],['homework','숙제 확인'],['hard','많이 틀린 문장'],['all','전체 기록'],['settings','설정']].map(([k,l])=>`<button class="tab" role="tab" data-t="${k}" aria-selected="${A.tab===k}">${l}</button>`).join('')}</div>
+  <div id="view"></div>`;
+  $('#reload').onclick=load;$('#out').onclick=()=>{A.key=null;A.rec=null;ss.set('admin.key',null);render()};
+  $('#period').onchange=e=>{A.period=e.target.value;A.cls='';A.open=null;render()};
+  $('#cls').onchange=e=>{A.cls=e.target.value;A.open=null;render()};
+  $('#sf').onsubmit=e=>{e.preventDefault();A.q=$('#q').value.trim();A.open=null;render()};
+  if($('#qclear'))$('#qclear').onclick=()=>{A.q='';A.open=null;render()};
+  $('#from').onchange=e=>{A.from=e.target.value;if(A.to&&A.from>A.to)A.to=A.from;A.open=null;render()};
+  $('#to').onchange=e=>{A.to=e.target.value;if(A.from&&A.to<A.from)A.from=A.to;A.open=null;render()};
+  app.querySelectorAll('.dchip[data-q]').forEach(b=>b.onclick=()=>{const t=today(),k=b.dataset.q;
+    [A.from,A.to]=k==='today'?[t,t]:k==='yesterday'?[addDays(t,-1),addDays(t,-1)]:k==='week'?[addDays(t,-6),t]:['',''];A.open=null;render()});
+  $('#ht').onchange=e=>{A.hideTest=e.target.checked;render()};
+  app.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{A.tab=b.dataset.t;render()});
+  view();
+}
+function view(){({students:vStudents,homework:vHomework,hard:vHard,all:vAll,settings:vSettings})[A.tab]()}
+async function post(body){const r=await fetch(SHEET_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({key:A.key},body))});return r.json()}
+
+function vStudents(){
+  const list=recs(),st=students(list),v=$('#view');
+  if(!st.length){v.innerHTML='<p class="empty">이 조건에 맞는 기록이 없습니다.</p>';return}
+  const avg=Math.round(list.reduce((a,r)=>a+r.score,0)/list.length);
+  v.innerHTML=`<section class="panel"><div class="stat"><div><b>${st.length}</b><span>학생</span></div><div><b>${list.length}</b><span>풀이 횟수</span></div><div><b>${avg}%</b><span>평균 점수</span></div><div><b>${hm(list.reduce((a,r)=>a+r.secs,0))}</b><span>총 학습 시간</span></div></div>
+  <div class="tw"><table><thead><tr>${A.cls?'':'<th>반</th>'}<th>이름</th><th>최근 14일</th><th>푼 날</th><th>풀이</th><th>평균</th><th>최근 점수</th><th>마지막</th><th>학습 시간</th></tr></thead><tbody>
+  ${st.map(s=>`<tr class="click ${A.open===s.k?'sel':''}" data-k="${esc(s.k)}">${A.cls?'':`<td>${esc(s.cls)}</td>`}<td style="white-space:nowrap">${esc(s.name)}${s.names.size>1?` <span class="note">(${[...s.names].map(esc).join(', ')})</span>`:''}</td><td>${strip(s)}</td><td class="n">${new Set(s.runs.map(r=>dkey(r.at))).size}일</td><td class="n">${s.n}회</td><td class="n">${pill(s.avg)}</td><td class="n">${pill(s.last.score)}</td><td class="n">${fmt(s.last.at)}</td><td class="n">${hm(s.secs)}</td></tr>
+  ${A.open===s.k?`<tr><td colspan="9">${detail(s)}</td></tr>`:''}`).join('')}
+  </tbody></table></div><p class="note">이름을 누르면 그 학생의 기록이 날짜별로 열립니다. 「최근 14일」 칸은 왼쪽이 오래된 날, 오른쪽이 오늘입니다 (연한 칸 1세트, 진한 칸 2세트 이상). 띄어쓰기만 다른 이름은 한 학생으로 묶었습니다.</p></section>`;
+  v.querySelectorAll('tr.click[data-k]').forEach(tr=>tr.onclick=()=>{A.open=A.open===tr.dataset.k?null:tr.dataset.k;A.openRun=null;A.days=null;vStudents()});
+  v.querySelectorAll('tr.day').forEach(tr=>tr.onclick=e=>{e.stopPropagation();const d=tr.dataset.d;A.days.has(d)?A.days.delete(d):A.days.add(d);vStudents()});
+  v.querySelectorAll('tr.run').forEach(tr=>tr.onclick=e=>{e.stopPropagation();A.openRun=A.openRun===tr.dataset.r?null:tr.dataset.r;vStudents()});
+}
+// 최근 14일 동안 날마다 몇 세트 풀었는지 작은 칸으로
+function strip(s){
+  const t=today(),cnt={};s.runs.forEach(r=>{const k=dkey(r.at);cnt[k]=(cnt[k]||0)+1});
+  return `<span class="strip">${Array.from({length:14},(_,i)=>{const k=addDays(t,i-13),c=cnt[k]||0;return `<i class="${c>1?'d2':c?'d1':''}" title="${dlabel(k)} · ${c}세트"></i>`}).join('')}</span>`;
+}
+// 학생 한 명의 기록을 날짜별로 묶어서. 처음에는 가장 최근 날만 펼침
+function detail(s){
+  const by=new Map();s.runs.forEach(r=>{const k=dkey(r.at);if(!by.has(k))by.set(k,[]);by.get(k).push(r)});
+  if(!A.days)A.days=new Set([...by.keys()].slice(0,1));
+  const hhmm=iso=>{const d=new Date(iso);return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`};
+  return `<div class="tw"><table><thead><tr><th>날짜 · 시각</th><th>시험</th><th>세트</th><th>방식</th><th>점수</th><th>걸린 시간</th><th>문장당 듣기</th></tr></thead><tbody>
+  ${[...by].map(([d,rs])=>{const open=A.days.has(d),avg=Math.round(rs.reduce((a,r)=>a+r.score,0)/rs.length);
+    return `<tr class="click day" data-d="${d}"><td colspan="7">${open?'▾':'▸'} ${dlabel(d)} <span class="note">· ${rs.length}세트 · 평균 ${avg}% · ${hm(rs.reduce((a,r)=>a+r.secs,0))}</span></td></tr>
+    ${open?rs.map(r=>{const id=r.at+'|'+r.name;return `<tr class="click run ${A.openRun===id?'sel':''}" data-r="${esc(id)}"><td class="n">${hhmm(r.at)}</td><td>${esc(r.test)}</td><td>${esc(r.set)} <span class="note">${esc(r.kind||'')}</span></td><td>${esc(r.mode)}</td><td class="n">${pill(r.score)}${nth(r)}</td><td class="n">${esc(r.time)}</td><td class="n">${esc(r.reps)}번</td></tr>
+    ${A.openRun===id?`<tr><td colspan="7">${sentences(r)}</td></tr>`:''}`}).join(''):''}`}).join('')}</tbody></table></div>`;
+}
+function sentences(r){
+  const d=A.det.filter(x=>x.at===r.at&&x.name===r.name&&x.cls===r.cls);
+  if(!d.length)return '<p class="note">문장별 기록이 없습니다.</p>';
+  return `<table><tbody>${d.map(x=>`<tr><td class="n">${esc(x.n)}</td><td class="n">${pill(x.s)}</td><td class="n">${esc(x.p)}회</td><td><div class="sent">${esc(x.t)}</div><div class="sent ans">→ ${x.a?esc(x.a):'(입력 없음)'}</div></td></tr>`).join('')}</tbody></table>`;
+}
+
+function vHomework(){
+  const v=$('#view');
+  if(!A.cls){v.innerHTML='<p class="empty">위에서 반을 먼저 선택하세요.</p>';return}
+  if(!A.books.length){v.innerHTML='<p class="empty">아직 올라온 문제가 없습니다. 「설정」 탭에서 문제 파일을 올려 주세요.</p>';return}
+  const book=A.books.find(b=>b.id===A.hwBook)||A.books[0];A.hwBook=book.id;
+  const bt=book.tests,opts=bt.map(t=>tname(book,t));
+  if(!A.hwTest||!opts.includes(A.hwTest))A.hwTest=opts[0];
+  const t=bt[opts.indexOf(A.hwTest)];
+  const all=(A.rec||[]).filter(r=>inDate(r)&&r.period===A.period&&r.cls===A.cls&&(!A.hideTest||!isTest(r)));
+  const st=students(all);
+  const sets=t.sets.map(s=>s.title),names=t.sets.map(s=>s.name||'');
+  v.innerHTML=`<section class="panel"><div class="row"><label class="f">책<select id="hwb">${A.books.map(b=>`<option value="${esc(b.id)}" ${b.id===A.hwBook?'selected':''}>${esc(b.title)}</option>`).join('')}</select></label><label class="f">숙제로 낸 테스트<select id="hw">${opts.map(o=>`<option value="${esc(o)}" ${o===A.hwTest?'selected':''}>${esc(o.slice(book.title.length+3))}</option>`).join('')}</select></label></div>
+  ${st.length?`<div class="tw"><table><thead><tr><th>이름</th><th>진행</th>${sets.map((s,i)=>`<th title="${esc(names[i])}">${esc(s)}${names[i]?`<br><span class="note" style="font-weight:400;letter-spacing:0">${esc(names[i])}</span>`:''}</th>`).join('')}</tr></thead><tbody>
+  ${st.map(s=>{const done=sets.map(x=>{const rs=s.runs.filter(r=>r.test===A.hwTest&&(r.set===x||r.set.startsWith(x+' ')));if(!rs.length)return null;return {n:Math.max(...rs.map(r=>r.try)),best:Math.max(...rs.map(r=>r.score))}});const c=done.filter(x=>x!=null).length;
+    return `<tr><td>${esc(s.name)}</td><td>${c===sets.length?'<span class="pill p-good">완료</span>':c?`<span class="pill p-mid">${c}/${sets.length}</span>`:'<span class="pill p-bad">안 함</span>'}</td>${done.map(x=>`<td class="n">${x==null?'<span class="note">–</span>':pill(x.best)+(x.n>1?`<br><span class="note">${x.n}번 제출</span>`:'')}</td>`).join('')}</tr>`}).join('')}
+  </tbody></table></div>`:'<p class="empty">이 반은 아직 기록이 없습니다.</p>'}
+  <p class="note">칸의 숫자는 그 세트의 최고 점수이고, 여러 번 제출했으면 몇 번 제출했는지 함께 나옵니다. 이 반에서 한 번이라도 풀이 기록이 있는 학생만 목록에 나옵니다.</p></section>`;
+  $('#hwb').onchange=e=>{A.hwBook=e.target.value;A.hwTest='';vHomework()};
+  $('#hw').onchange=e=>{A.hwTest=e.target.value;vHomework()};
+}
+
+function vHard(){
+  const v=$('#view'),keep=new Set(recs().map(r=>r.at+'|'+r.name));
+  const d=(A.det||[]).filter(x=>keep.has(x.at+'|'+x.name));
+  const m=new Map();d.forEach(x=>{const k=x.test+'|'+x.set+'|'+x.t;if(!m.has(k))m.set(k,{test:x.test,set:x.set,t:x.t,sum:0,n:0});const o=m.get(k);o.sum+=x.s;o.n++});
+  const list=[...m.values()].map(o=>({...o,avg:Math.round(o.sum/o.n)})).sort((a,b)=>a.avg-b.avg||b.n-a.n).slice(0,30);
+  v.innerHTML=list.length?`<section class="panel"><div class="tw"><table><thead><tr><th>평균</th><th>응시</th><th>시험 · 세트</th><th>문장</th></tr></thead><tbody>
+  ${list.map(o=>`<tr><td class="n">${pill(o.avg)}</td><td class="n">${o.n}명</td><td>${esc(o.test)} · ${esc(o.set)}</td><td class="sent">${esc(o.t)}</td></tr>`).join('')}</tbody></table></div>
+  <p class="note">지금 고른 기간·반에서 평균 점수가 낮은 문장 30개입니다.</p></section>`:'<p class="empty">이 조건에 맞는 기록이 없습니다.</p>';
+}
+
+function vAll(){
+  const list=recs().slice().sort((a,b)=>a.at<b.at?1:-1),v=$('#view');
+  v.innerHTML=list.length?`<section class="panel"><div class="tw"><table><thead><tr><th>일시</th><th>반</th><th>이름</th><th>시험</th><th>세트</th><th>방식</th><th>점수</th><th>걸린 시간</th></tr></thead><tbody>
+  ${list.slice(0,500).map(r=>`<tr><td class="n">${fmt(r.at)}</td><td>${esc(r.cls)}</td><td>${esc(r.name)}</td><td>${esc(r.test)}</td><td>${esc(r.set)}</td><td>${esc(r.mode)}</td><td class="n">${pill(r.score)}${nth(r)}</td><td class="n">${esc(r.time)}</td></tr>`).join('')}
+  </tbody></table></div>${list.length>500?'<p class="note">최근 500건만 보여 줍니다. 전체는 구글 시트에서 보세요.</p>':''}</section>`:'<p class="empty">이 조건에 맞는 기록이 없습니다.</p>';
+}
+
+// 입장 코드 · 정답 공개 · 문제 올리기
+function vSettings(){
+  const v=$('#view'),st=A.settings||{code:'',showAnswers:true};
+  const n=A.books.map(b=>`${esc(b.title)} (테스트 ${b.tests.length}개 · 세트 ${b.tests.reduce((a,t)=>a+t.sets.length,0)}개)`).join(', ');
+  v.innerHTML=`<section class="panel" style="display:flex;flex-direction:column;gap:14px">
+    <form id="cf" class="row" style="align-items:flex-end;gap:8px">
+      <label class="f">학생 입장 코드<input id="ec" value="${esc(st.code)}" placeholder="예: usher1029" autocomplete="off" spellcheck="false"></label>
+      <button class="btn" type="submit">저장</button></form>
+    <p class="note">학생은 처음 들어올 때 이 코드를 입력합니다. 코드를 바꾸면 모든 학생이 새 코드를 다시 입력해야 합니다. 짐작하기 어려운 6자 이상을 권합니다.</p>
+    <label class="row" style="gap:8px"><input type="checkbox" id="sa" ${st.showAnswers?'checked':''}> 제출 후 정답 문장 보여 주기</label>
+    <p class="note">끄면 제출 후에도 점수만 보이고 정답 문장은 나오지 않습니다.</p>
+    <hr style="border:0;border-top:1px solid var(--line);width:100%">
+    <div><b>문제</b> <span class="note">${n||'아직 올라온 문제가 없습니다.'}</span></div>
+    <div class="row" style="gap:8px;align-items:center"><label class="btn ghost" style="cursor:pointer">문제 파일(JSON) 올리기<input type="file" id="up" accept=".json,application/json" hidden></label>
+      <button class="btn ghost" id="rl" type="button">시트 다시 읽기</button></div>
+    <p class="note">같은 책을 다시 올리면 그 책의 문제만 새것으로 바뀝니다. 구글 시트 「문제」 탭을 직접 고쳤다면 「시트 다시 읽기」를 누르세요.</p>
+    <p id="smsg" class="note" aria-live="polite"></p>
+    <hr style="border:0;border-top:1px solid var(--line);width:100%">
+    <div><b>음성</b> <span class="note" id="astat">확인 중…</span></div>
+    <div class="row" style="gap:8px;align-items:center"><label class="btn ghost" style="cursor:pointer">음성 폴더 올리기<input type="file" id="aup" webkitdirectory multiple hidden></label>
+      <label class="row note" style="gap:6px"><input type="checkbox" id="askip" checked> 이미 올라온 세트는 건너뛰기</label></div>
+    <p class="note">음성은 구글 드라이브 「딕테이션 음원」 폴더에 세트마다 파일 하나로 저장되고, 입장 코드를 넣은 학생에게만 전달됩니다. 세트 수가 많으면 올리는 데 시간이 걸리니 이 창을 닫지 마세요.</p>
+    <p id="amsg" class="note" aria-live="polite"></p></section>`;
+  const msg=(t,bad)=>{const m=$('#smsg');m.textContent=t;m.className=bad?'warn':'note'};
+  const done=r=>{if(!r.ok){msg(r.message||'저장하지 못했습니다.',true);return false}A.books=r.books||A.books;if(r.settings)A.settings=r.settings;return true};
+  $('#cf').onsubmit=async e=>{e.preventDefault();const code=$('#ec').value.trim();if(!code)return msg('코드를 입력하세요.',true);msg('저장 중…');
+    try{if(done(await post({action:'settings',code})))msg('입장 코드를 저장했습니다.')}catch(x){msg('연결에 실패했습니다.',true)}};
+  $('#sa').onchange=async e=>{msg('저장 중…');try{if(done(await post({action:'settings',showAnswers:e.target.checked})))msg(e.target.checked?'제출 후 정답을 보여 줍니다.':'제출 후 정답을 숨깁니다.')}catch(x){msg('연결에 실패했습니다.',true)}};
+  $('#rl').onclick=async()=>{msg('다시 읽는 중…');try{if(done(await post({action:'reload'}))){msg('시트를 다시 읽었습니다.');vSettings();msg('시트를 다시 읽었습니다.')}}catch(x){msg('연결에 실패했습니다.',true)}};
+  // 음성: 상태 보기와 폴더 올리기
+  const astat=()=>post({action:'audioStatus'}).then(r=>{const el=$('#astat');if(!el)return;if(!r.ok){el.textContent=r.message||'확인하지 못했습니다.';return}
+    const a=r.audio;el.textContent=`세트 ${a.files}개 올라옴`+(a.missing.length?` · 음성 없는 세트 ${a.missing.length}개 (${a.missing.slice(0,3).join(', ')}${a.missing.length>3?' …':''})`:' · 빠진 세트 없음');}).catch(()=>{const el=$('#astat');if(el)el.textContent='확인하지 못했습니다.'});
+  astat();
+  $('#aup').onchange=async e=>{
+    const files=[...e.target.files].filter(f=>/^[A-Za-z0-9-]+_[A-Za-z0-9-]+\.json$/.test(f.name));const am=$('#amsg');
+    if(!files.length){am.textContent='올릴 음성 파일(…_….json)이 없는 폴더입니다.';am.className='warn';return}
+    let skip=new Set();
+    if($('#askip').checked){const r=await post({action:'audioStatus'}).catch(()=>null);
+      if(r&&r.ok){const miss=new Set(r.audio.missing);A.books.forEach(b=>b.tests.forEach(t=>t.sets.forEach(s=>{if(!miss.has(b.title+' · '+t.title+(t.sub?' · '+t.sub:'')+' · '+s.title))skip.add(t.id+'_'+s.id+'.json')})))}}
+    const todo=files.filter(f=>!skip.has(f.name));let done=0,fail=[];
+    for(const f of todo){
+      if(A.tab!=='settings')break;
+      am.className='note';am.textContent=`올리는 중… ${done}/${todo.length} (${f.name})`;
+      let ok=false;for(let t=0;t<2&&!ok;t++){try{const r=await post({action:'saveAudio',name:f.name,data:await f.text()});ok=!!r.ok}catch(x){}}
+      ok?done++:fail.push(f.name);
+    }
+    am.className=fail.length?'warn':'note';am.textContent=`올렸습니다. ${done}개`+(files.length-todo.length?` · 이미 있어서 건너뜀 ${files.length-todo.length}개`:'')+(fail.length?` · 실패 ${fail.length}개: ${fail.slice(0,5).join(', ')}`:'');astat()};
+  $('#up').onchange=async e=>{const f=e.target.files[0];if(!f)return;let data;
+    try{data=JSON.parse(await f.text());if(!data.book||!Array.isArray(data.tests))throw 0}catch(x){return msg('문제 파일 형식이 맞지 않습니다.',true)}
+    if(!confirm(`「${data.book.title}」 문제를 올릴까요? (테스트 ${data.tests.length}개)\n같은 책의 예전 문제는 새것으로 바뀝니다.`))return;
+    msg('올리는 중… (1분쯤 걸릴 수 있어요)');
+    try{const r=await post({action:'upload',data});if(done(r)){vSettings();msg(`올렸습니다. 문장 ${r.rows}개.`)}}catch(x){msg('연결에 실패했습니다.',true)}};
+}
+
+if(A.key)load();else render();
+</script>
+</body></html>
