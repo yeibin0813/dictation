@@ -11,16 +11,19 @@
 //   기록               : 모든 반의 풀이 기록 (한 번 풀 때마다 한 줄)
 //   문장별             : 모든 반의 문장별 답 (문장마다 한 줄)
 //   <기간> <반>        : 반별 풀이 기록 (예: "2026년 10월 주니어 화목 U반")
+//   삭제한 학생        : 관리자 페이지에서 지운 학생 (기록 줄은 그대로 두고, 적힌 때까지의 기록만 관리자 화면에서 감춤)
 //
 // 관리자 비밀번호는 ⚙ 프로젝트 설정 → 스크립트 속성에 ADMIN_KEY 라는 이름으로 넣어 주세요.
 
 const SUMMARY = '기록';
 const DETAIL = '문장별';
 const PROBLEMS = '문제';
+const REMOVED = '삭제한 학생';
 const AUDIO_FOLDER = '딕테이션 음원';
 const LEGACY_UNTIL = new Date('2026-10-29T21:30:00+09:00');
 const SUMMARY_HEADER = ['일시', '기간', '반', '이름', '시험', '세트', '유형', '방식', '총점(%)', '걸린 시간', '걸린 시간(초)', '문장당 듣기', '평균 들은 횟수'];
 const DETAIL_HEADER = ['일시', '기간', '반', '이름', '시험', '세트', '방식', '번호', '정답 문장', '학생 답', '점수(%)', '들은 횟수'];
+const REMOVED_HEADER = ['삭제한 때', '기간', '반', '이름'];
 const PROBLEM_HEADER = ['책 id', '책', '테스트 id', '테스트', '모듈', '세트 id', '세트', '지문 이름', '유형', '번호', '문장', '빈칸 ( | 로 구분)', '음성 파일', '시작(초)', '끝(초)'];
 
 function sheet_(name, header) {
@@ -71,7 +74,7 @@ function doPost(e) {
 }
 function handle_(r) {
   const a = r.action;
-  if (a === 'admin' || a === 'settings' || a === 'upload' || a === 'reload' || a === 'saveAudio' || a === 'audioStatus') {
+  if (a === 'admin' || a === 'settings' || a === 'upload' || a === 'reload' || a === 'saveAudio' || a === 'audioStatus' || a === 'removeStudent' || a === 'restoreStudent') {
     const ok = adminOk_(r.key);
     if (ok !== 'ok') return json_({ ok: false, error: ok });
     if (a === 'settings') {
@@ -81,8 +84,9 @@ function handle_(r) {
     if (a === 'upload') { const n = upload_(r.data); bump_(); return json_({ ok: true, rows: n, books: catalog_() }); }
     if (a === 'saveAudio') return json_(Object.assign({ ok: true }, saveAudio_(r.name, r.data)));
     if (a === 'audioStatus') return json_({ ok: true, audio: audioStatus_() });
+    if (a === 'removeStudent' || a === 'restoreStudent') return json_({ ok: true, removed: removed_(a === 'removeStudent', r) });
     if (a === 'reload') bump_();
-    if (a === 'admin') return json_({ ok: true, records: rows_(SUMMARY), details: rows_(DETAIL), books: catalog_(), settings: settings_() });
+    if (a === 'admin') return json_({ ok: true, records: rows_(SUMMARY), details: rows_(DETAIL), removed: rows_(REMOVED), books: catalog_(), settings: settings_() });
     return json_({ ok: true, books: catalog_(), settings: settings_() });
   }
   // 예전 사이트(입장 코드 없음)의 기록은 새 사이트로 바꾸는 날 밤까지만 받습니다.
@@ -94,6 +98,29 @@ function handle_(r) {
   if (a === 'grade') return json_(gradeOne_(r));
   if (a === 'submit') return submit_(r);
   return json_({ ok: false, error: 'action' });
+}
+
+/* ---------- 학생 삭제 ---------- */
+// 지우기: 「삭제한 학생」 탭에 지금 시각과 함께 적습니다. 그 시각까지의 기록은 관리자 화면에서 빠지고, 그 뒤에 새로 낸 기록은 다시 보입니다.
+// 되살리기: 그 학생(기간·반·이름이 같고 띄어쓰기만 다른 이름 포함)의 줄을 이 탭에서 모두 지웁니다.
+function removed_(add, r) {
+  const period = clean_(r.period), cls = clean_(r.cls), name = clean_(r.name);
+  if (!period || !cls || !name) throw new Error('학생 정보가 없습니다.');
+  const nk = s => String(s).replace(/\s+/g, '');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sh = sheet_(REMOVED, REMOVED_HEADER);
+    if (add) sh.appendRow([new Date(), text_(period), text_(cls), text_(name)]);
+    else {
+      const vals = rows_(REMOVED);
+      for (let i = vals.length - 1; i >= 0; i--) // 아래 줄부터 지워야 줄 번호가 밀리지 않음
+        if (String(vals[i][1]) === period && String(vals[i][2]) === cls && nk(vals[i][3]) === nk(name)) sh.deleteRow(i + 2);
+    }
+  } finally {
+    lock.releaseLock();
+  }
+  return rows_(REMOVED);
 }
 
 /* ---------- 문제 ---------- */

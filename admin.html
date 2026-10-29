@@ -31,6 +31,7 @@ input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
 label.f{display:flex;flex-direction:column;gap:3px;font-size:.8rem;color:var(--muted)}
 .btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:6px;padding:8px 16px;font-weight:600}
 .btn.ghost{background:none;color:var(--accent);border:1px solid var(--line)}
+.btn.danger{background:none;color:var(--bad);border:1px solid var(--bad)}
 .note{font-size:.85rem;color:var(--muted)}
 .warn{background:var(--bad-soft);border-radius:6px;padding:10px 12px;font-size:.9rem}
 .tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
@@ -72,7 +73,7 @@ const SHEET_URL="https://script.google.com/macros/s/AKfycby2TjxwpDQwk1I6ym7570mV
 const $=s=>document.querySelector(s),app=$('#app');
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const ss={get(k){try{return sessionStorage.getItem(k)}catch(e){return null}},set(k,v){try{v==null?sessionStorage.removeItem(k):sessionStorage.setItem(k,v)}catch(e){}}};
-const A={books:[],settings:null,hwBook:'',key:ss.get('admin.key'),rec:null,det:null,tab:'students',period:'',cls:'',q:'',from:'',to:'',hideTest:true,open:null,openRun:null,hwTest:'',err:''};
+const A={books:[],settings:null,hwBook:'',key:ss.get('admin.key'),all:null,rec:null,det:null,removed:[],flash:'',tab:'students',period:'',cls:'',q:'',from:'',to:'',hideTest:true,open:null,openRun:null,hwTest:'',err:''};
 
 /* ---------- data ---------- */
 // 기록: [일시,기간,반,이름,시험,세트,유형,방식,총점,걸린시간,초,문장당듣기,평균들은횟수]
@@ -95,14 +96,23 @@ async function load(){
     const j=await r.json();
     if(!j.ok){A.err={wrong:'비밀번호가 맞지 않습니다.',locked:'비밀번호를 여러 번 틀려서 10분 동안 잠겼습니다. 잠시 후 다시 시도하세요.',nokey:'구글 시트에 관리자 비밀번호(ADMIN_KEY)가 아직 설정되지 않았습니다.',action:'구글 시트 코드가 예전 버전입니다. 새 코드로 다시 배포해 주세요.'}[j.error]||'불러오지 못했습니다.';
       if(j.error==='wrong'||j.error==='locked'){A.key=null;ss.set('admin.key',null)}A.rec=null;render();return}
-    A.rec=j.records.map(r=>({at:r[0],period:asPeriod(r[1]),cls:String(r[2]),name:String(r[3]),test:asTest(r[4]),set:asSet(r[5]),kind:r[6],mode:r[7],score:+r[8]||0,time:String(r[9]).replace(/^'/,''),secs:+r[10]||0,reps:r[11],plays:r[12]}));
+    const rec=j.records.map(r=>({at:r[0],period:asPeriod(r[1]),cls:String(r[2]),name:String(r[3]),test:asTest(r[4]),set:asSet(r[5]),kind:r[6],mode:r[7],score:+r[8]||0,time:String(r[9]).replace(/^'/,''),secs:+r[10]||0,reps:r[11],plays:r[12]}));
     A.books=j.books||[];A.settings=j.settings||null;
-    A.det=j.details.map(r=>({at:r[0],cls:String(r[2]),name:String(r[3]),test:asTest(r[4]),set:asSet(r[5]),n:r[7],t:r[8],a:r[9],s:+r[10]||0,p:r[11]}));
+    const det=j.details.map(r=>({at:r[0],period:asPeriod(r[1]),cls:String(r[2]),name:String(r[3]),test:asTest(r[4]),set:asSet(r[5]),n:r[7],t:r[8],a:r[9],s:+r[10]||0,p:r[11]}));
     // 같은 학생이 같은 세트를 몇 번째로 풀었는지 (정답을 본 뒤 다시 푼 기록을 가려내기 위해, 방식과 상관없이)
-    const seen={};A.rec.slice().sort((a,b)=>a.at<b.at?-1:1).forEach(r=>{const k=[r.cls,nk(r.name),r.test,r.set].join('|');r.try=seen[k]=(seen[k]||0)+1});
+    const seen={};rec.slice().sort((a,b)=>a.at<b.at?-1:1).forEach(r=>{const k=[r.cls,nk(r.name),r.test,r.set].join('|');r.try=seen[k]=(seen[k]||0)+1});
+    A.all={rec,det};setRemoved(j.removed);
     if(!A.period){const ps=[...new Set(A.rec.map(r=>r.period))];A.period=ps.includes(PERIODS[0].title)?PERIODS[0].title:(ps[0]||'')}
   }catch(e){A.err='연결에 실패했습니다. 인터넷 연결을 확인하고 다시 시도하세요.'}
   render();
+}
+// 삭제한 학생: 「삭제한 학생」 탭에 적힌 때까지의 기록은 관리자 화면에서 뺍니다 (구글 시트의 기록 줄은 그대로). 그 뒤에 낸 기록은 다시 보입니다.
+const rkey=(p,c,n)=>[p,c,nk(n)].join('|');
+function setRemoved(rows){
+  A.removed=(rows||[]).map(r=>({at:r[0],period:asPeriod(r[1]),cls:String(r[2]),name:String(r[3])}));
+  const until={};A.removed.forEach(d=>{const k=rkey(d.period,d.cls,d.name);if(!until[k]||until[k]<d.at)until[k]=d.at});
+  const keep=r=>{const u=until[rkey(r.period,r.cls,r.name)];return !u||r.at>u};
+  A.rec=A.all.rec.filter(keep);A.det=A.all.det.filter(keep);
 }
 const isTest=r=>/테스트|확인용/.test(r.name);
 const dkey=iso=>{const d=new Date(iso);return isNaN(d)?'':`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
@@ -175,13 +185,15 @@ async function post(body){const r=await fetch(SHEET_URL,{method:'POST',headers:{
 
 function vStudents(){
   const list=recs(),st=students(list),v=$('#view');
-  if(!st.length){v.innerHTML='<p class="empty">이 조건에 맞는 기록이 없습니다.</p>';return}
+  if(!st.length){v.innerHTML=(A.flash?`<p class="note" role="status">${esc(A.flash)}</p>`:'')+'<p class="empty">이 조건에 맞는 기록이 없습니다.</p>';A.flash='';return}
   const avg=Math.round(list.reduce((a,r)=>a+r.score,0)/list.length);
-  v.innerHTML=`<section class="panel"><div class="stat"><div><b>${st.length}</b><span>학생</span></div><div><b>${list.length}</b><span>풀이 횟수</span></div><div><b>${avg}%</b><span>평균 점수</span></div><div><b>${hm(list.reduce((a,r)=>a+r.secs,0))}</b><span>총 학습 시간</span></div></div>
+  v.innerHTML=`<section class="panel">${A.flash?`<p class="note" role="status">${esc(A.flash)}</p>`:''}<div class="stat"><div><b>${st.length}</b><span>학생</span></div><div><b>${list.length}</b><span>풀이 횟수</span></div><div><b>${avg}%</b><span>평균 점수</span></div><div><b>${hm(list.reduce((a,r)=>a+r.secs,0))}</b><span>총 학습 시간</span></div></div>
   <div class="tw"><table><thead><tr>${A.cls?'':'<th>반</th>'}<th>이름</th><th>최근 14일</th><th>푼 날</th><th>풀이</th><th>평균</th><th>최근 점수</th><th>마지막</th><th>학습 시간</th></tr></thead><tbody>
   ${st.map(s=>`<tr class="click ${A.open===s.k?'sel':''}" data-k="${esc(s.k)}">${A.cls?'':`<td>${esc(s.cls)}</td>`}<td style="white-space:nowrap">${esc(s.name)}${s.names.size>1?` <span class="note">(${[...s.names].map(esc).join(', ')})</span>`:''}</td><td>${strip(s)}</td><td class="n">${new Set(s.runs.map(r=>dkey(r.at))).size}일</td><td class="n">${s.n}회</td><td class="n">${pill(s.avg)}</td><td class="n">${pill(s.last.score)}</td><td class="n">${fmt(s.last.at)}</td><td class="n">${hm(s.secs)}</td></tr>
   ${A.open===s.k?`<tr><td colspan="9">${detail(s)}</td></tr>`:''}`).join('')}
-  </tbody></table></div><p class="note">이름을 누르면 그 학생의 기록이 날짜별로 열립니다. 「최근 14일」 칸은 왼쪽이 오래된 날, 오른쪽이 오늘입니다 (연한 칸 1세트, 진한 칸 2세트 이상). 띄어쓰기만 다른 이름은 한 학생으로 묶었습니다.</p></section>`;
+  </tbody></table></div><p class="note">이름을 누르면 그 학생의 기록이 날짜별로 열립니다. 「최근 14일」 칸은 왼쪽이 오래된 날, 오른쪽이 오늘입니다 (연한 칸 1세트, 진한 칸 2세트 이상). 띄어쓰기만 다른 이름은 한 학생으로 묶었습니다. 그만둔 학생은 이름을 눌러 연 뒤 「이 학생 삭제」로 목록에서 뺄 수 있습니다.</p></section>`;
+  A.flash='';
+  const del=$('#del');if(del)del.onclick=e=>{e.stopPropagation();removeStudent(st.find(s=>s.k===A.open))};
   v.querySelectorAll('tr.click[data-k]').forEach(tr=>tr.onclick=()=>{A.open=A.open===tr.dataset.k?null:tr.dataset.k;A.openRun=null;A.days=null;vStudents()});
   v.querySelectorAll('tr.day').forEach(tr=>tr.onclick=e=>{e.stopPropagation();const d=tr.dataset.d;A.days.has(d)?A.days.delete(d):A.days.add(d);vStudents()});
   v.querySelectorAll('tr.run').forEach(tr=>tr.onclick=e=>{e.stopPropagation();A.openRun=A.openRun===tr.dataset.r?null:tr.dataset.r;vStudents()});
@@ -196,11 +208,22 @@ function detail(s){
   const by=new Map();s.runs.forEach(r=>{const k=dkey(r.at);if(!by.has(k))by.set(k,[]);by.get(k).push(r)});
   if(!A.days)A.days=new Set([...by.keys()].slice(0,1));
   const hhmm=iso=>{const d=new Date(iso);return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`};
-  return `<div class="tw"><table><thead><tr><th>날짜 · 시각</th><th>시험</th><th>세트</th><th>방식</th><th>점수</th><th>걸린 시간</th><th>문장당 듣기</th></tr></thead><tbody>
+  return `<div class="row" style="justify-content:flex-end;gap:8px;margin-bottom:8px"><span class="note" id="dmsg" aria-live="polite"></span><button class="btn danger" type="button" id="del">이 학생 삭제</button></div><div class="tw"><table><thead><tr><th>날짜 · 시각</th><th>시험</th><th>세트</th><th>방식</th><th>점수</th><th>걸린 시간</th><th>문장당 듣기</th></tr></thead><tbody>
   ${[...by].map(([d,rs])=>{const open=A.days.has(d),avg=Math.round(rs.reduce((a,r)=>a+r.score,0)/rs.length);
     return `<tr class="click day" data-d="${d}"><td colspan="7">${open?'▾':'▸'} ${dlabel(d)} <span class="note">· ${rs.length}세트 · 평균 ${avg}% · ${hm(rs.reduce((a,r)=>a+r.secs,0))}</span></td></tr>
     ${open?rs.map(r=>{const id=r.at+'|'+r.name;return `<tr class="click run ${A.openRun===id?'sel':''}" data-r="${esc(id)}"><td class="n">${hhmm(r.at)}</td><td>${esc(r.test)}</td><td>${esc(r.set)} <span class="note">${esc(r.kind||'')}</span></td><td>${esc(r.mode)}</td><td class="n">${pill(r.score)}${nth(r)}</td><td class="n">${esc(r.time)}</td><td class="n">${esc(r.reps)}번</td></tr>
     ${A.openRun===id?`<tr><td colspan="7">${sentences(r)}</td></tr>`:''}`}).join(''):''}`}).join('')}</tbody></table></div>`;
+}
+// 학생 삭제: 지금 고른 기간의 그 반·이름 기록을 (날짜 조건과 상관없이) 모두 관리자 화면에서 뺍니다.
+async function removeStudent(s){
+  if(!s)return;
+  const period=s.runs[0].period,k=rkey(period,s.cls,s.name),n=A.rec.filter(r=>rkey(r.period,r.cls,r.name)===k).length,m=$('#dmsg');
+  if(!confirm(`${s.name} 학생(${s.cls})을 삭제할까요?\n\n${period} 기록 ${n}건이 관리자 화면에서 빠집니다. 구글 시트의 기록은 남아 있어서 「설정」 탭에서 되살릴 수 있습니다.`))return;
+  m.textContent='삭제 중…';
+  try{const r=await post({action:'removeStudent',period,cls:s.cls,name:s.name});
+    if(!r.ok){m.textContent=r.error==='code'||r.error==='action'?'구글 시트 코드가 예전 버전입니다. 새 코드로 다시 배포해 주세요.':(r.message||'삭제하지 못했습니다.');return}
+    setRemoved(r.removed);A.open=null;A.flash=`${s.name} 학생(${s.cls})을 삭제했습니다. 「설정」 탭에서 되살릴 수 있습니다.`;render()}
+  catch(x){m.textContent='연결에 실패했습니다.'}
 }
 function sentences(r){
   const d=A.det.filter(x=>x.at===r.at&&x.name===r.name&&x.cls===r.cls);
@@ -246,9 +269,11 @@ function vAll(){
   </tbody></table></div>${list.length>500?'<p class="note">최근 500건만 보여 줍니다. 전체는 구글 시트에서 보세요.</p>':''}</section>`:'<p class="empty">이 조건에 맞는 기록이 없습니다.</p>';
 }
 
-// 입장 코드 · 정답 공개 · 문제 올리기
+// 입장 코드 · 정답 공개 · 문제 올리기 · 삭제한 학생
 function vSettings(){
   const v=$('#view'),st=A.settings||{code:'',showAnswers:true};
+  const gone=new Map();A.removed.forEach(d=>{const k=rkey(d.period,d.cls,d.name),g=gone.get(k);if(!g||g.at<d.at)gone.set(k,Object.assign({k},d))});
+  const hidden=g=>A.all.rec.filter(r=>rkey(r.period,r.cls,r.name)===g.k&&r.at<=g.at).length;
   const n=A.books.map(b=>`${esc(b.title)} (테스트 ${b.tests.length}개 · 세트 ${b.tests.reduce((a,t)=>a+t.sets.length,0)}개)`).join(', ');
   v.innerHTML=`<section class="panel" style="display:flex;flex-direction:column;gap:14px">
     <form id="cf" class="row" style="align-items:flex-end;gap:8px">
@@ -268,7 +293,18 @@ function vSettings(){
     <div class="row" style="gap:8px;align-items:center"><label class="btn ghost" style="cursor:pointer">음성 폴더 올리기<input type="file" id="aup" webkitdirectory multiple hidden></label>
       <label class="row note" style="gap:6px"><input type="checkbox" id="askip" checked> 이미 올라온 세트는 건너뛰기</label></div>
     <p class="note">음성은 구글 드라이브 「딕테이션 음원」 폴더에 세트마다 파일 하나로 저장되고, 입장 코드를 넣은 학생에게만 전달됩니다. 세트 수가 많으면 올리는 데 시간이 걸리니 이 창을 닫지 마세요.</p>
-    <p id="amsg" class="note" aria-live="polite"></p></section>`;
+    <p id="amsg" class="note" aria-live="polite"></p>
+    <hr style="border:0;border-top:1px solid var(--line);width:100%">
+    <div><b>삭제한 학생</b> <span class="note">${gone.size?gone.size+'명':'없음'}</span></div>
+    ${gone.size?`<div class="tw"><table><thead><tr><th>기간</th><th>반</th><th>이름</th><th>삭제한 때</th><th>빠진 기록</th><th></th></tr></thead><tbody>
+    ${[...gone.values()].sort((a,b)=>a.at<b.at?1:-1).map(g=>`<tr><td>${esc(g.period)}</td><td>${esc(g.cls)}</td><td>${esc(g.name)}</td><td class="n">${fmt(g.at)}</td><td class="n">${hidden(g)}건</td><td><button class="btn ghost" type="button" data-restore="${esc(g.k)}">되살리기</button></td></tr>`).join('')}</tbody></table></div>`:''}
+    <p class="note">학생은 「학생별」 탭에서 이름을 눌러 연 뒤 「이 학생 삭제」로 지웁니다. 구글 시트의 기록은 지우지 않고 관리자 화면에서만 뺍니다. 지운 뒤에 그 학생이 새로 제출하면 그 기록부터 다시 보입니다.</p>
+    <p id="rmsg" class="note" aria-live="polite"></p></section>`;
+  v.querySelectorAll('[data-restore]').forEach(b=>b.onclick=async()=>{const g=gone.get(b.dataset.restore),m=$('#rmsg');m.className='note';m.textContent='되살리는 중…';
+    try{const r=await post({action:'restoreStudent',period:g.period,cls:g.cls,name:g.name});
+      if(!r.ok){m.className='warn';m.textContent=r.message||'되살리지 못했습니다.';return}
+      setRemoved(r.removed);render();$('#rmsg').textContent=`${g.name} 학생(${g.cls})의 기록을 되살렸습니다.`}
+    catch(x){m.className='warn';m.textContent='연결에 실패했습니다.'}});
   const msg=(t,bad)=>{const m=$('#smsg');m.textContent=t;m.className=bad?'warn':'note'};
   const done=r=>{if(!r.ok){msg(r.message||'저장하지 못했습니다.',true);return false}A.books=r.books||A.books;if(r.settings)A.settings=r.settings;return true};
   $('#cf').onsubmit=async e=>{e.preventDefault();const code=$('#ec').value.trim();if(!code)return msg('코드를 입력하세요.',true);msg('저장 중…');
