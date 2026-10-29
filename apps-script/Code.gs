@@ -3,7 +3,7 @@
 // 문장·정답은 이 시트의 「문제」 탭에만 있고, 사이트(GitHub)에는 없습니다. 채점도 여기서 합니다.
 // 음성은 내 드라이브의 「딕테이션 음원」 폴더에 세트마다 파일 하나(<테스트 id>_<세트 id>.json)로 있고,
 // 입장 코드가 맞는 학생에게만 이 서버가 꺼내 보냅니다.
-// 학생은 사이트에서 기간 → 반 → 이름 → 입장 코드로 들어옵니다.
+// 학생은 사이트에서 기간 → 반 → 이름 → 입장 코드로 들어옵니다. 「내 기록」에서는 같은 기간·반·이름으로 낸 기록만 봅니다.
 // 관리자 페이지(admin.html)의 「설정」 탭에서 입장 코드를 정하고, 문제 파일(JSON)을 올립니다.
 //
 // 시트 탭
@@ -46,13 +46,15 @@ function json_(o) {
   return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
 }
 
-// 시트 값을 JSON으로 보낼 수 있게 (날짜는 ISO 문자열로)
-function rows_(name) {
+// 시트 값 (머리글 줄 빼고)
+function values_(name) {
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
   if (!sh || sh.getLastRow() < 2) return [];
-  return sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn()).getValues()
-    .map(r => r.map(v => v instanceof Date ? v.toISOString() : v));
+  return sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn()).getValues();
 }
+const iso_ = v => v instanceof Date ? v.toISOString() : v;
+// 시트 값을 JSON으로 보낼 수 있게 (날짜는 ISO 문자열로)
+const rows_ = name => values_(name).map(r => r.map(iso_));
 
 // 관리자 비밀번호 확인. 10분에 10번 넘게 틀리면 잠시 막습니다.
 function adminOk_(key) {
@@ -97,6 +99,7 @@ function handle_(r) {
   if (a === 'audio') return audio_(r);
   if (a === 'grade') return json_(gradeOne_(r));
   if (a === 'submit') return submit_(r);
+  if (a === 'mine') return json_(mine_(r));
   return json_({ ok: false, error: 'action' });
 }
 
@@ -298,7 +301,7 @@ function grade_(ref, typed) {
   words.forEach((w, k) => norm_(w).forEach(t => { tok.push(t); own.push(k); }));
   const fa = lcs_(tok, norm_(String(typed || '')));
   const bad = new Set(); fa.forEach((ok, x) => { if (!ok) bad.add(own[x]); });
-  return { hit: fa.filter(Boolean).length, total: tok.length, html: words.map((w, k) => `<span class="${bad.has(k) ? 'miss' : 'ok'}">${esc_(w)}</span>`).join(' ') };
+  return { hit: fa.filter(Boolean).length, total: tok.length, bad: [...bad], html: words.map((w, k) => `<span class="${bad.has(k) ? 'miss' : 'ok'}">${esc_(w)}</span>`).join(' ') };
 }
 function pieces_(it) {
   const out = []; let pos = 0;
@@ -356,6 +359,37 @@ function submit_(r) {
   }
   const show = settings_().showAnswers;
   return json_({ ok: true, score, showAnswers: show, items: graded.map(g => show ? { s: g.s, html: g.html } : { s: g.s }) });
+}
+
+/* ---------- 내 기록 (학생) ---------- */
+// 입장한 학생(기간·반이 같고, 이름은 띄어쓰기만 달라도 같은 학생)의 기록만 보냅니다. 오래된 것부터.
+// try: 같은 세트를 몇 번째로 냈는지 (관리자 화면처럼 방식과 상관없이). 관리자가 지운 학생이면 지운 때까지의 기록은 뺍니다.
+// 정답 문장은 「정답 보여 주기」가 켜져 있을 때만 보내고, 전체 받아쓰기는 틀린 단어 위치(m)도 함께 보냅니다.
+function mine_(r) {
+  const period = clean_(r.period), cls = clean_(r.cls), name = clean_(r.stu);
+  if (!period || !cls || !name) return { ok: false, error: 'auth' };
+  const nk = s => String(s).replace(/\s+/g, '');
+  // 시트가 「2026년 10월」, 「2-01」 같은 글자를 날짜로 바꿔 저장한 예전 줄은 원래 글자로 되돌림
+  const per = v => v instanceof Date ? v.getFullYear() + '년 ' + (v.getMonth() + 1) + '월' : String(v);
+  const setName = v => v instanceof Date ? (v.getMonth() + 1) + '-' + String(v.getDate()).padStart(2, '0') + ' 세트' : String(v);
+  const test = v => /^TEST \d/.test(String(v)) ? 'NEW TOEFL 2 · ' + v : String(v); // 책 구분이 생기기 전 기록
+  const ms = v => new Date(v).getTime();
+  const me = x => per(x[1]) === period && String(x[2]) === cls && nk(x[3]) === nk(name);
+  const since = values_(REMOVED).filter(me).reduce((m, x) => Math.max(m, ms(x[0])), 0);
+  const seen = {};
+  const records = values_(SUMMARY).filter(me).sort((x, y) => ms(x[0]) - ms(y[0])).map(x => {
+    const k = test(x[4]) + '|' + setName(x[5]);
+    return { at: iso_(x[0]), test: test(x[4]), set: setName(x[5]), kind: String(x[6]), mode: String(x[7]), score: +x[8] || 0,
+      time: String(x[9]).replace(/^'/, ''), secs: +x[10] || 0, reps: +x[11] || 1, try: seen[k] = (seen[k] || 0) + 1, keep: ms(x[0]) > since };
+  }).filter(x => x.keep);
+  records.forEach(x => delete x.keep);
+  const show = settings_().showAnswers;
+  const details = values_(DETAIL).filter(x => me(x) && ms(x[0]) > since).map(x => {
+    const o = { at: iso_(x[0]), n: +x[7] || 0, a: String(x[9]), s: +x[10] || 0, p: +x[11] || 0 };
+    if (show) { o.t = String(x[8]); if (x[6] !== '빈칸') o.m = grade_(o.t, o.a).bad; }
+    return o;
+  });
+  return { ok: true, showAnswers: show, records, details };
 }
 
 // 예전 사이트(문장이 사이트에 있던 때)가 보내는 기록. LEGACY_UNTIL 까지만 받습니다.

@@ -96,12 +96,34 @@ td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowra
 tr.run{cursor:pointer} tr.run:hover td{background:var(--accent-soft)}
 .det{display:flex;flex-direction:column;gap:10px;padding:4px 0 8px}
 .det div{display:flex;flex-direction:column;gap:2px}
+/* 내 기록 */
+.stat{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px}
+.stat div{display:flex;flex-direction:column;gap:2px}
+.stat b{font-family:var(--mono);font-size:1.4rem;font-weight:500;font-variant-numeric:tabular-nums}
+.stat span{font-size:.8rem;color:var(--muted)}
+.days{display:flex;flex-direction:column}
+.day{border-top:1px solid var(--line)}
+.dayh{width:100%;background:none;border:0;padding:12px 0;display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;text-align:left;font-weight:600}
+.runs{list-style:none;margin:0 0 10px;padding:0;display:flex;flex-direction:column;gap:2px}
+.runh{width:100%;background:none;border:0;border-radius:6px;padding:10px 8px;display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:2px 12px;align-items:start;text-align:left}
+.runh:hover,.runh[aria-expanded="true"]{background:var(--accent-soft)}
+.runh .tm{font-family:var(--mono);font-size:.85rem;color:var(--muted);padding-top:2px;font-variant-numeric:tabular-nums}
+.runh .tt{overflow-wrap:anywhere}
+.runh small,.rp small{display:block;font-size:.8rem;color:var(--muted);font-family:var(--sans)}
+.runh .sc{text-align:right}
+.sens{list-style:none;margin:0 0 8px;padding:0 8px}
+.sens li{display:grid;grid-template-columns:24px minmax(0,1fr) 52px;gap:4px 10px;padding:10px 0;border-top:1px dashed var(--line)}
+.sens .num{font-family:var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.sens .sent{-webkit-user-select:none;user-select:none}.sens .sent .ok{color:inherit}
+.sens .rp{padding-top:0}
+.mya{margin:0;font-family:var(--mono);font-size:.92rem;color:var(--muted);overflow-wrap:anywhere}
 kbd{font-family:var(--mono);font-size:.8rem;border:1px solid var(--line);border-radius:4px;padding:0 5px;background:var(--bg)}
 </style>
 
 <div class="wrap">
   <header class="top">
     <h1>딕테이션</h1>
+    <nav class="tabs" id="tabs" role="tablist" hidden><button class="tab" role="tab" data-v="home">문제 풀기</button><button class="tab" role="tab" data-v="mine">내 기록</button></nav>
   </header>
   <main id="app"></main>
 </div>
@@ -154,7 +176,8 @@ function load(src){blobTried=false;audio.pause();audio.dataset.rel=src;audio.src
 function play(){audio.playbackRate=S.rate;try{audio.currentTime=0}catch(e){}audio.play().catch(()=>{});S.plays++;const c=$('#plays');if(c)c.textContent=S.plays+'회 들음'}
 
 /* ---------- views ---------- */
-function render(){({home,run})[S.view]();}
+function render(){const t=$('#tabs');t.hidden=!S.me||!S.cat||S.view==='run';t.querySelectorAll('.tab').forEach(b=>b.setAttribute('aria-selected',b.dataset.v===S.view));({home,run,mine})[S.view]();}
+$('#tabs').addEventListener('click',e=>{const v=e.target.dataset&&e.target.dataset.v;if(!v||v===S.view)return;S.view=v;S.mine=null;render()});
 // 입장한 뒤 목록을 아직 못 받았으면 받아 옴
 async function loadCat(){
   app.innerHTML='<section class="panel"><p class="note">문제 목록을 불러오는 중입니다…</p></section>';
@@ -337,7 +360,7 @@ function reveal(k,html){const fb=$('#fb'+k);if(!html||!fb)return;fb.innerHTML=ht
 // 붙여넣기·끌어다 놓기·복사 막기 (정답을 베껴 넣지 못하게)
 ['paste','drop'].forEach(t=>document.addEventListener(t,e=>{if(S.view!=='run'||!e.target.matches||!e.target.matches('.line,.blank'))return;
   e.preventDefault();const m=$('#nopaste');if(!m)return;m.hidden=false;clearTimeout(S.pasteT);S.pasteT=setTimeout(()=>{m.hidden=true},3000)},true));
-['copy','cut'].forEach(t=>document.addEventListener(t,e=>{if(S.view==='run')e.preventDefault()},true));
+['copy','cut'].forEach(t=>document.addEventListener(t,e=>{if(S.view==='run'||S.view==='mine')e.preventDefault()},true));
 // Enter: 남은 횟수 안에서 다시 듣기 · Tab: 바로 다음 문장 (이전 문장으로는 돌아갈 수 없음)
 document.addEventListener('keydown',e=>{
   if(S.view!=='run'||S.submitted||e.isComposing||(e.key!=='Tab'&&e.key!=='Enter'))return;
@@ -364,8 +387,52 @@ async function finish(){
   S.score=r.score;S.last[lastKey(S.set)]=r.score;ls.set('dict.last',S.last);
   r.items.forEach((x,k)=>{S.rows[k].s=x.s;showScore(k);reveal(k,x.html)});
   $('#acc').textContent=r.score+'%';show();
-  $('#foot').innerHTML=`<span class="note">${r.showAnswers?'스피커를 눌러 다시 들으며 정답을 확인할 수 있습니다.':'스피커를 눌러 다시 들을 수 있습니다.'}</span><button class="btn" id="back">다른 세트 풀기</button>`;
+  $('#foot').innerHTML=`<span class="note">${r.showAnswers?'스피커를 눌러 다시 들으며 정답을 확인할 수 있습니다.':'스피커를 눌러 다시 들을 수 있습니다.'}</span><span class="row"><button class="btn ghost" id="tomine">내 기록 보기</button><button class="btn" id="back">다른 세트 풀기</button></span>`;
   $('#back').onclick=()=>{audio.pause();S.view='home';render()};
+  $('#tomine').onclick=()=>{audio.pause();S.view='mine';S.mine=null;render()};
+}
+
+/* ---------- 내 기록 ---------- */
+const dkey=iso=>{const d=new Date(iso);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
+const dlabel=k=>{const d=new Date(k+'T00:00');return `${d.getMonth()+1}월 ${d.getDate()}일 (${'일월화수목금토'[d.getDay()]})`};
+const hhmm=iso=>{const d=new Date(iso);return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`};
+const hm=t=>t>=3600?Math.floor(t/3600)+'시간 '+Math.round(t%3600/60)+'분':Math.round(t/60)+'분';
+const avgOf=rs=>Math.round(rs.reduce((a,r)=>a+r.score,0)/rs.length);
+// 서버에서 이 학생(기간·반·이름)의 기록만 받아 날짜별로. 처음에는 가장 최근 날만 펼침
+async function mine(){
+  if(!S.me)return login();
+  if(!S.mine){
+    app.innerHTML='<section class="panel"><p class="note">기록을 불러오는 중입니다…</p></section>';
+    try{const r=await api({action:'mine',period:S.me.period,cls:S.me.cls,stu:S.me.name});if(codeFail(r))return;if(!r.ok)throw 0;
+      S.mine=r;S.mineDays=null;S.mineOpen=null}
+    catch(e){if(S.view!=='mine')return;app.innerHTML='<section class="panel"><p class="warn">기록을 불러오지 못했습니다. 인터넷 연결을 확인하세요.</p><div class="row"><button class="btn" id="again">다시 시도</button></div></section>';$('#again').onclick=mine;return}
+    if(S.view!=='mine')return;
+  }
+  const R=S.mine.records.slice().reverse();
+  if(!R.length){app.innerHTML=`<section class="panel"><h2>내 기록</h2><p class="note">${esc(who())}</p><p>아직 제출한 기록이 없어요. 세트를 풀고 제출하면 여기에 날짜별로 쌓입니다.</p></section>`;return}
+  const by=new Map();R.forEach(r=>{const k=dkey(r.at);if(!by.has(k))by.set(k,[]);by.get(k).push(r)});
+  if(!S.mineDays)S.mineDays=new Set([...by.keys()].slice(0,1));
+  app.innerHTML=`<section class="panel">
+    <div class="row" style="justify-content:space-between"><h2>내 기록</h2><span class="note">${esc(who())}</span></div>
+    <div class="stat"><div><b>${R.length}회</b><span>제출</span></div><div><b>${avgOf(R)}%</b><span>평균 점수</span></div><div><b>${by.size}일</b><span>공부한 날</span></div><div><b>${hm(R.reduce((a,r)=>a+r.secs,0))}</b><span>학습 시간</span></div></div>
+    <div class="days">${[...by].map(([d,rs])=>{const open=S.mineDays.has(d);return `<div class="day">
+      <button class="dayh" data-d="${d}" aria-expanded="${open}"><span>${open?'▾':'▸'} ${dlabel(d)}</span><span class="note">${rs.length}세트 · 평균 ${avgOf(rs)}%</span></button>
+      ${open?`<ul class="runs">${rs.map(runRow).join('')}</ul>`:''}</div>`}).join('')}</div>
+    <p class="note">${esc(S.me.period)}에 이 반·이름으로 낸 기록입니다. 세트를 누르면 문장마다 쓴 답${S.mine.showAnswers?'과 정답(틀린 단어 표시)':''}이 보입니다.</p>
+  </section>`;
+  app.querySelectorAll('.dayh').forEach(b=>b.onclick=()=>{const d=b.dataset.d;S.mineDays.has(d)?S.mineDays.delete(d):S.mineDays.add(d);mine()});
+  app.querySelectorAll('.runh').forEach(b=>b.onclick=()=>{S.mineOpen=S.mineOpen===b.dataset.r?null:b.dataset.r;mine()});
+}
+function runRow(r){const open=S.mineOpen===r.at;
+  return `<li><button class="runh" data-r="${esc(r.at)}" aria-expanded="${open}"><span class="tm">${hhmm(r.at)}</span>
+    <span class="tt">${esc(r.test)}<small>${esc(r.set)}${r.kind?' · '+esc(r.kind):''} · ${esc(r.mode)} 받아쓰기 · ${esc(r.time)}</small></span>
+    <span class="sc">${pill(r.score)}<small>${r.try}번째</small></span></button>${open?sentences(r):''}</li>`}
+// 문장별: 정답이 오면 틀린 단어(m)에 표시, 그 아래 내가 쓴 답
+function sentences(r){
+  const d=S.mine.details.filter(x=>x.at===r.at);
+  if(!d.length)return '<p class="note" style="padding:0 8px 8px">문장별 기록이 없습니다.</p>';
+  const marked=x=>{if(!x.m)return esc(x.t);const m=new Set(x.m);return x.t.split(/\s+/).filter(Boolean).map((w,k)=>`<span class="${m.has(k)?'miss':'ok'}">${esc(w)}</span>`).join(' ')};
+  return `<ol class="sens">${d.map(x=>`<li><span class="num">${x.n}</span><div class="cell">${x.t!=null?`<p class="sent">${marked(x)}</p>`:''}<p class="mya">${x.t!=null?'내 답: ':''}${x.a?esc(x.a):'(입력 없음)'}</p></div><span class="rp ${x.s===100?'full':''}">${x.s}%<small>${x.p}회 들음</small></span></li>`).join('')}</ol>`;
 }
 
 render();
