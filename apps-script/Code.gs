@@ -221,12 +221,31 @@ function audio_(r) {
 // 관리자 화면용: 올라온 음성 파일 수와 음성이 빠진 세트
 function audioStatus_() {
   const folder = audioFolder_(false), names = new Set();
-  if (folder) { const it = folder.getFiles(); while (it.hasNext()) { const f = it.next(); if (!f.isTrashed()) names.add(f.getName()); } }
+  if (folder) { const it = folder.getFiles(); while (it.hasNext()) { const f = it.next(); if (!f.isTrashed() && PACK_RE.test(f.getName())) names.add(f.getName()); } }
   const missing = [];
   catalog_().forEach(b => b.tests.forEach(t => t.sets.forEach(s => {
     if (!names.has(packName_(t.id, s.id))) missing.push(b.title + ' · ' + t.title + (t.sub ? ' · ' + t.sub : '') + ' · ' + s.title);
   })));
   return { folder: !!folder, files: names.size, missing };
+}
+
+// 편집기에서 실행(관리자 페이지 없이 처음 설정할 때): 「딕테이션 음원」 폴더에 넣어 둔 문제 파일(dictation-problems-*.json)을
+// 「문제」 탭으로 불러오고, 입장 코드가 없으면 새로 만듭니다. 결과(입장 코드 포함)는 실행 로그에 나옵니다.
+function setupFromDrive() {
+  const folder = audioFolder_(false);
+  if (!folder) throw new Error('드라이브에 「' + AUDIO_FOLDER + '」 폴더가 없습니다.');
+  const it = folder.getFiles(), done = [];
+  while (it.hasNext()) {
+    const f = it.next();
+    if (!f.isTrashed() && /^dictation-problems.*\.json$/.test(f.getName())) done.push(f.getName() + ' → 문장 ' + upload_(JSON.parse(f.getBlob().getDataAsString())) + '개');
+  }
+  bump_();
+  if (!settings_().code) props_().setProperty('ENTRY_CODE', 'usher' + String(Math.floor(1000 + Math.random() * 9000)));
+  const st = audioStatus_();
+  Logger.log('문제: ' + (done.join(', ') || '불러온 파일 없음'));
+  Logger.log('책: ' + catalog_().map(b => b.title + ' (테스트 ' + b.tests.length + '개)').join(', '));
+  Logger.log('음성: 세트 ' + st.files + '개, 음성 없는 세트 ' + st.missing.length + '개');
+  Logger.log('입장 코드: ' + settings_().code);
 }
 
 /* ---------- 채점 ---------- */
