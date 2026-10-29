@@ -140,6 +140,7 @@ function build_() {
     const key = tid + '/' + sid;
     (sets[key] = sets[key] || []).push({ t, b: b ? b.split('|').map(x => x.trim()).filter(Boolean) : [], src, st: +st || 0, en: +en || 0 });
   });
+  books.sort((x, y) => x.id.localeCompare(y.id, 'en', { numeric: true })); // 책 순서는 시트 순서가 아니라 책 id 순 (book1, book2, …)
   return { books, sets };
 }
 function cached_(what) {
