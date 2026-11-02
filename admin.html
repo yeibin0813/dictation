@@ -64,6 +64,13 @@ tr.day td .note{font-weight:400}
 .dchip b{font-family:var(--mono);font-weight:500;color:var(--accent)}
 .dchip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .dchip[aria-pressed="true"] b{color:var(--accent-ink)}
+.hwgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:6px 12px;max-height:260px;overflow:auto;padding:2px}
+.hwg{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.hwg .dchip{padding:2px 8px}
+.hwg .hwt{min-width:62px;justify-content:center}
+.sets{display:flex;flex-wrap:wrap;gap:4px;margin:2px 0 6px}
+.sets .pill{font-size:.75rem}
+.p-none{background:var(--bg);color:var(--muted);outline:1px dashed var(--line)}
 </style></head><body>
 <div class="wrap" id="app"></div>
 <script src="classes.js"></script>
@@ -73,7 +80,8 @@ const SHEET_URL="https://script.google.com/macros/s/AKfycby2TjxwpDQwk1I6ym7570mV
 const $=s=>document.querySelector(s),app=$('#app');
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const ss={get(k){try{return sessionStorage.getItem(k)}catch(e){return null}},set(k,v){try{v==null?sessionStorage.removeItem(k):sessionStorage.setItem(k,v)}catch(e){}}};
-const A={books:[],settings:null,hwBook:'',key:ss.get('admin.key'),all:null,rec:null,det:null,removed:[],flash:'',tab:'students',period:'',cls:'',q:'',from:'',to:'',hideTest:true,open:null,openRun:null,hwTest:'',err:''};
+const ls={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+const A={books:[],settings:null,hwBook:'',key:ss.get('admin.key'),all:null,rec:null,det:null,removed:[],flash:'',tab:'students',period:'',cls:'',q:'',from:'',to:'',hideTest:true,open:null,openRun:null,hwSel:[],hwKey:null,hwOpen:null,hwPick:false,hwTodo:false,err:''};
 
 /* ---------- data ---------- */
 // 기록: [일시,기간,반,이름,시험,세트,유형,방식,총점,걸린시간,초,문장당듣기,평균들은횟수]
@@ -231,25 +239,72 @@ function sentences(r){
   return `<table><tbody>${d.map(x=>`<tr><td class="n">${esc(x.n)}</td><td class="n">${pill(x.s)}</td><td class="n">${esc(x.p)}회</td><td><div class="sent">${esc(x.t)}</div><div class="sent ans">→ ${x.a?esc(x.a):'(입력 없음)'}</div></td></tr>`).join('')}</tbody></table>`;
 }
 
+// 숙제 확인: 고른 반(전체 반도 가능)의 학생 × 고른 테스트·모듈.
+// 날짜 조건은 쓰지 않고 고른 기간의 기록을 모두 봅니다. 고른 숙제는 반마다 이 브라우저에 기억합니다.
 function vHomework(){
   const v=$('#view');
-  if(!A.cls){v.innerHTML='<p class="empty">위에서 반을 먼저 선택하세요.</p>';return}
   if(!A.books.length){v.innerHTML='<p class="empty">아직 올라온 문제가 없습니다. 「설정」 탭에서 문제 파일을 올려 주세요.</p>';return}
+  const all=(A.rec||[]).filter(r=>r.period===A.period&&(!A.cls||r.cls===A.cls)&&(!A.hideTest||!isTest(r)));
+  const hk='hw.'+A.period+'|'+A.cls;
+  if(A.hwKey!==hk){
+    A.hwKey=hk;A.hwOpen=null;let saved=null;try{saved=JSON.parse(ls.get(hk))}catch(e){}
+    if(saved&&A.books.some(b=>b.id===saved.book)){A.hwBook=saved.book;A.hwSel=saved.tests||[]}
+    else{ // 처음 보는 반이면 그 반이 가장 최근에 푼 테스트(모든 모듈)를 골라 둠
+      const last=all.reduce((m,r)=>!m||r.at>m.at?r:m,null);
+      const hit=last&&A.books.map(b=>({b,t:b.tests.find(t=>tname(b,t)===last.test)})).find(x=>x.t);
+      if(hit){A.hwBook=hit.b.id;A.hwSel=hit.b.tests.filter(t=>t.title===hit.t.title).map(t=>t.id)}else{A.hwBook=A.books[0].id;A.hwSel=[]}
+    }
+    A.hwPick=!A.hwSel.length;
+  }
   const book=A.books.find(b=>b.id===A.hwBook)||A.books[0];A.hwBook=book.id;
-  const bt=book.tests,opts=bt.map(t=>tname(book,t));
-  if(!A.hwTest||!opts.includes(A.hwTest))A.hwTest=opts[0];
-  const t=bt[opts.indexOf(A.hwTest)];
-  const all=(A.rec||[]).filter(r=>inDate(r)&&r.period===A.period&&r.cls===A.cls&&(!A.hideTest||!isTest(r)));
-  const st=students(all);
-  const sets=t.sets.map(s=>s.title),names=t.sets.map(s=>s.name||'');
-  v.innerHTML=`<section class="panel"><div class="row"><label class="f">책<select id="hwb">${A.books.map(b=>`<option value="${esc(b.id)}" ${b.id===A.hwBook?'selected':''}>${esc(b.title)}</option>`).join('')}</select></label><label class="f">숙제로 낸 테스트<select id="hw">${opts.map(o=>`<option value="${esc(o)}" ${o===A.hwTest?'selected':''}>${esc(o.slice(book.title.length+3))}</option>`).join('')}</select></label></div>
-  ${st.length?`<div class="tw"><table><thead><tr><th>이름</th><th>진행</th>${sets.map((s,i)=>`<th title="${esc(names[i])}">${esc(s)}${names[i]?`<br><span class="note" style="font-weight:400;letter-spacing:0">${esc(names[i])}</span>`:''}</th>`).join('')}</tr></thead><tbody>
-  ${st.map(s=>{const done=sets.map(x=>{const rs=s.runs.filter(r=>r.test===A.hwTest&&(r.set===x||r.set.startsWith(x+' ')));if(!rs.length)return null;return {n:Math.max(...rs.map(r=>r.try)),best:Math.max(...rs.map(r=>r.score))}});const c=done.filter(x=>x!=null).length;
-    return `<tr><td>${esc(s.name)}</td><td>${c===sets.length?'<span class="pill p-good">완료</span>':c?`<span class="pill p-mid">${c}/${sets.length}</span>`:'<span class="pill p-bad">안 함</span>'}</td>${done.map(x=>`<td class="n">${x==null?'<span class="note">–</span>':pill(x.best)+(x.n>1?`<br><span class="note">${x.n}번 제출</span>`:'')}</td>`).join('')}</tr>`}).join('')}
-  </tbody></table></div>`:'<p class="empty">이 반은 아직 기록이 없습니다.</p>'}
-  <p class="note">칸의 숫자는 그 세트의 최고 점수이고, 여러 번 제출했으면 몇 번 제출했는지 함께 나옵니다. 이 반에서 한 번이라도 풀이 기록이 있는 학생만 목록에 나옵니다.</p></section>`;
-  $('#hwb').onchange=e=>{A.hwBook=e.target.value;A.hwTest='';vHomework()};
-  $('#hw').onchange=e=>{A.hwTest=e.target.value;vHomework()};
+  const save=()=>ls.set(hk,JSON.stringify({book:book.id,tests:A.hwSel}));
+  const sel=book.tests.filter(t=>A.hwSel.includes(t.id));
+  const groups=[];book.tests.forEach(t=>{let g=groups.find(x=>x.title===t.title);if(!g)groups.push(g={title:t.title,tests:[]});g.tests.push(t)});
+  const who={};all.forEach(r=>(who[r.test]=who[r.test]||new Set()).add(r.cls+'|'+nk(r.name)));
+  const short=t=>t.sub?t.sub.replace(/^MODULE\s*/,'M'):t.title;
+  const label=sel.length?groups.filter(g=>g.tests.some(t=>A.hwSel.includes(t.id))).map(g=>{const ts=g.tests.filter(t=>A.hwSel.includes(t.id));return g.title+(ts.length<g.tests.length?' ('+ts.map(short).join(', ')+')':'')}).join(' · '):'';
+  const picker=`<div class="hwgrid">${groups.map(g=>{const on=g.tests.every(t=>A.hwSel.includes(t.id)),one=g.tests.length===1&&!g.tests[0].sub;
+    const chip=t=>{const n=(who[tname(book,t)]||new Set()).size;return `<button class="dchip" type="button" data-id="${esc(t.id)}" aria-pressed="${A.hwSel.includes(t.id)}" title="${n?`이 반에서 ${n}명이 풂`:'아직 푼 학생 없음'}">${esc(one?t.title:short(t))}${n?` <b>${n}</b>`:''}</button>`};
+    return `<div class="hwg">${one?chip(g.tests[0]):`<button class="dchip hwt" type="button" data-g="${esc(g.title)}" aria-pressed="${on}">${esc(g.title)}</button>${g.tests.map(chip).join('')}`}</div>`}).join('')}</div>
+    <p class="note">TEST 이름을 누르면 그 테스트의 모듈이 모두 골라지고, M1·M2 같은 칸으로 모듈을 하나씩 넣고 뺄 수 있습니다. 칸 옆 숫자는 이 반에서 그 모듈을 푼 학생 수입니다.</p>`;
+  // 학생마다 고른 모듈의 세트별 최고 점수
+  const st=students(all).map(s=>{
+    const mods=sel.map(t=>{const tn=tname(book,t),sets=t.sets.map(x=>{const rs=s.runs.filter(r=>r.test===tn&&(r.set===x.title||r.set.startsWith(x.title+' ')));
+      return {x,r:rs.length?{n:Math.max(...rs.map(r=>r.try)),best:Math.max(...rs.map(r=>r.score))}:null}});
+      const d=sets.filter(y=>y.r);return {t,sets,c:d.length,avg:d.length?Math.round(d.reduce((a,y)=>a+y.r.best,0)/d.length):0}});
+    const c=mods.reduce((a,m)=>a+m.c,0),tot=mods.reduce((a,m)=>a+m.sets.length,0);
+    return Object.assign(s,{mods,c,tot,state:c===tot&&tot?'done':c?'part':'none'})});
+  const cnt={done:0,part:0,none:0};st.forEach(s=>cnt[s.state]++);
+  const show=A.hwTodo?st.filter(s=>s.state!=='done'):st;
+  const single=sel.length===1;
+  const prog=s=>s.state==='done'?'<span class="pill p-good">완료</span>':s.state==='part'?`<span class="pill p-mid">${s.c}/${s.tot}</span>`:'<span class="pill p-bad">안 함</span>';
+  const setCell=y=>y.r?pill(y.r.best)+(y.r.n>1?`<br><span class="note">${y.r.n}번 제출</span>`:''):'<span class="note">–</span>';
+  const modCell=m=>m.c?`<span class="pill ${m.c===m.sets.length?'p-good':'p-mid'}">${m.c}/${m.sets.length}</span><br><span class="note">평균 ${m.avg}%</span>`:'<span class="note">–</span>';
+  const head=single?sel[0].sets.map(x=>`<th title="${esc(x.name||'')}">${esc(x.title)}${x.name?`<br><span class="note" style="font-weight:400;letter-spacing:0">${esc(x.name)}</span>`:''}</th>`).join('')
+    :sel.map(t=>`<th>${esc(t.title)}${t.sub?`<br><span class="note" style="font-weight:400;letter-spacing:0">${esc(t.sub)}</span>`:''}</th>`).join('');
+  const ncol=(A.cls?0:1)+2+(single?sel[0].sets.length:sel.length);
+  const more=s=>s.mods.map(m=>`<div><b style="font-size:.85rem">${esc(m.t.title)}${m.t.sub?' · '+esc(m.t.sub):''}</b><div class="sets">${m.sets.map(y=>`<span class="pill ${y.r?(y.r.best>=80?'p-good':y.r.best>=50?'p-mid':'p-bad'):'p-none'}" title="${esc(y.x.name||'')}">${esc(y.x.title)} ${y.r?y.r.best+'%'+(y.r.n>1?` · ${y.r.n}번`:''):'–'}</span>`).join('')}</div></div>`).join('');
+  v.innerHTML=`<section class="panel">
+    <div class="row" style="align-items:flex-end"><label class="f">책<select id="hwb">${A.books.map(b=>`<option value="${esc(b.id)}" ${b.id===A.hwBook?'selected':''}>${esc(b.title)}</option>`).join('')}</select></label>
+      <div style="flex:1;min-width:200px;display:flex;flex-direction:column;gap:3px"><span class="note" style="font-size:.8rem">숙제로 낸 테스트</span><b>${label?esc(label):'<span class="note">아직 고르지 않았습니다</span>'}</b></div>
+      <button class="btn ghost" type="button" id="hwp">${A.hwPick?'다 골랐어요':'숙제 바꾸기'}</button>${sel.length?'<button class="btn ghost" type="button" id="hwc">모두 빼기</button>':''}</div>
+    ${A.hwPick?picker:''}
+    ${!sel.length?'<p class="empty">위에서 숙제로 낸 테스트를 골라 주세요.</p>':!st.length?'<p class="empty">이 반은 이 기간에 아직 기록이 없습니다.</p>':`
+    <div class="row"><div class="stat"><div><b>${cnt.done}</b><span>완료</span></div><div><b>${cnt.part}</b><span>하는 중</span></div><div><b>${cnt.none}</b><span>안 함</span></div></div>
+      <label class="row note" style="gap:6px"><input type="checkbox" id="hwt" ${A.hwTodo?'checked':''}> 다 안 한 학생만 보기</label></div>
+    <div class="tw"><table><thead><tr>${A.cls?'':'<th>반</th>'}<th>이름</th><th>진행</th>${head}</tr></thead><tbody>
+    ${show.map(s=>`<tr class="click ${A.hwOpen===s.k?'sel':''}" data-k="${esc(s.k)}">${A.cls?'':`<td>${esc(s.cls)}</td>`}<td style="white-space:nowrap">${esc(s.name)}</td><td style="white-space:nowrap">${prog(s)}</td>${single?s.mods[0].sets.map(y=>`<td class="n">${setCell(y)}</td>`).join(''):s.mods.map(m=>`<td class="n">${modCell(m)}</td>`).join('')}</tr>
+    ${A.hwOpen===s.k&&!single?`<tr><td colspan="${ncol}">${more(s)}</td></tr>`:''}`).join('')}
+    </tbody></table></div>`}
+    <p class="note">이 탭은 위의 날짜 조건과 상관없이 고른 기간의 기록을 모두 봅니다. 학생 목록은 이 기간에 이 반에서 한 번이라도 제출한 학생입니다 (한 번도 제출하지 않은 학생은 기록이 없어 나오지 않습니다). 숫자는 세트별 최고 점수이고, ${single?'여러 번 제출했으면 제출 횟수가 함께 나옵니다':'모듈 칸은 푼 세트 수와 평균입니다. 학생 이름을 누르면 세트별 점수가 열립니다'}.</p></section>`;
+  $('#hwb').onchange=e=>{A.hwBook=e.target.value;A.hwSel=[];A.hwPick=true;save();vHomework()};
+  $('#hwp').onclick=()=>{A.hwPick=!A.hwPick;vHomework()};
+  if($('#hwc'))$('#hwc').onclick=()=>{A.hwSel=[];A.hwPick=true;save();vHomework()};
+  if($('#hwt'))$('#hwt').onchange=e=>{A.hwTodo=e.target.checked;vHomework()};
+  v.querySelectorAll('.hwg [data-id]').forEach(b=>b.onclick=()=>{const id=b.dataset.id;A.hwSel=A.hwSel.includes(id)?A.hwSel.filter(x=>x!==id):[...A.hwSel,id];save();vHomework()});
+  v.querySelectorAll('.hwg [data-g]').forEach(b=>b.onclick=()=>{const ids=book.tests.filter(t=>t.title===b.dataset.g).map(t=>t.id),on=ids.every(id=>A.hwSel.includes(id));
+    A.hwSel=on?A.hwSel.filter(x=>!ids.includes(x)):[...new Set([...A.hwSel,...ids])];save();vHomework()});
+  if(!single)v.querySelectorAll('tr.click[data-k]').forEach(tr=>tr.onclick=()=>{A.hwOpen=A.hwOpen===tr.dataset.k?null:tr.dataset.k;vHomework()});
 }
 
 function vHard(){
