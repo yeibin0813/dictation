@@ -185,13 +185,18 @@ async function loadCat(){
     if(!S.cat.length){app.innerHTML='<section class="panel"><p class="warn">아직 올라온 문제가 없습니다. 선생님께 알려 주세요.</p></section>';return}render()}
   catch(e){app.innerHTML='<section class="panel"><p class="warn">문제 목록을 불러오지 못했습니다. 인터넷 연결을 확인하세요.</p><div class="row"><button class="btn" id="again">다시 시도</button></div></section>';$('#again').onclick=loadCat}
 }
-// 기간 → 반 선택 → 이름 입력. 반 목록은 classes.js
+// 지금 기간: 오늘과 같은 달이 classes.js에 있으면 그 달, 없으면 맨 앞 기간. 학생은 지금 기간으로만 들어옵니다.
+const curPeriod=()=>{const t=(d=>`${d.getFullYear()}년 ${d.getMonth()+1}월`)(new Date());return PERIODS.find(p=>p.title===t)||PERIODS[0]};
+// 지난달 기간으로 저장된 입장 정보: 이번 달에 같은 반이 있으면 이번 달로 옮기고, 없으면 반을 다시 고르게
+(()=>{const m=S.me,per=curPeriod();if(!m||m.period===per.title)return;
+  if(per.groups.some(g=>g.classes.some(c=>g.name+' '+c===m.cls))){m.period=per.title;ls.set('dict.me',m);return}
+  S.me=null;ls.set('dict.me',null);S.lastName=m.name;S.loginErr='새 달이 시작됐어요. 반을 다시 골라 주세요.'})();
+// 반 선택 → 이름 입력. 반 목록은 classes.js
 function login(){
-  const nowTitle=(d=>`${d.getFullYear()}년 ${d.getMonth()+1}월`)(new Date());
-  const pi=Math.max(0,PERIODS.findIndex(p=>p.title===(S.pickPeriod||nowTitle))),per=PERIODS[pi];
+  const per=curPeriod();
   app.innerHTML=`<section class="panel" style="max-width:420px;width:100%;margin:0 auto">
     <h2>시작하기</h2>
-    <label class="f" for="per">기간<select id="per">${PERIODS.map((p,i)=>`<option value="${i}" ${i===pi?'selected':''}>${esc(p.title)}</option>`).join('')}</select></label>
+    <p class="note">기간: ${esc(per.title)}</p>
     <label class="f" for="cls">반<select id="cls"><option value="">반을 선택하세요</option>${per.groups.map((g,gi)=>`<optgroup label="${esc(g.name)}">${
       g.classes.map((c,ci)=>`<option value="${gi}.${ci}">${esc(g.name+' '+c)}</option>`).join('')}</optgroup>`).join('')}</select></label>
     <label class="f" for="nm">이름<input type="text" id="nm" maxlength="20" placeholder="예: 김민서" autocomplete="off" value="${esc(S.lastName||'')}"></label>
@@ -199,7 +204,6 @@ function login(){
     <p class="warn" id="lerr" ${S.loginErr?'':'hidden'}>${esc(S.loginErr||'')}</p>
     <button class="btn" id="enter">시작</button>
   </section>`;
-  $('#per').onchange=e=>{S.pickPeriod=PERIODS[+e.target.value].title;login()};
   const go=async()=>{const v=$('#cls').value,name=$('#nm').value.trim().replace(/\s+/g,' '),code=$('#code').value.trim(),er=$('#lerr'),bt=$('#enter');
     const err=m=>{er.textContent=m;er.hidden=false};
     if(!v)return err('반을 선택하세요.');
