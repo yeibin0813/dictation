@@ -91,6 +91,8 @@ const ISO=/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
 const asPeriod=v=>{v=String(v);if(!ISO.test(v))return v;const d=new Date(v);return `${d.getFullYear()}년 ${d.getMonth()+1}월`};
 const asSet=v=>{v=String(v);if(!ISO.test(v))return v;const d=new Date(v);return `${d.getMonth()+1}-${String(d.getDate()).padStart(2,'0')} 세트`};
 const nk=s=>String(s).replace(/\s+/g,'');
+// 관리자 화면의 기간은 제출한 날짜의 달로 정합니다 (학생이 지난달 기간으로 들어와 낸 기록도 그 달로 모임)
+const monthOf=(at,v)=>{const d=new Date(at);return isNaN(d)?asPeriod(v):`${d.getFullYear()}년 ${d.getMonth()+1}월`};
 // 시험 이름: 「책 · TEST n · MODULE n」. 책 이름이 없는 예전 기록은 첫 번째 책으로 봅니다.
 // 책·테스트 목록은 서버(구글 시트 「문제」 탭)에서 받습니다 (A.books).
 const OLD_BOOK='NEW TOEFL 2'; // 책 구분이 생기기 전 기록은 이 책
@@ -104,9 +106,9 @@ async function load(){
     const j=await r.json();
     if(!j.ok){A.err={wrong:'비밀번호가 맞지 않습니다.',locked:'비밀번호를 여러 번 틀려서 10분 동안 잠겼습니다. 잠시 후 다시 시도하세요.',nokey:'구글 시트에 관리자 비밀번호(ADMIN_KEY)가 아직 설정되지 않았습니다.',action:'구글 시트 코드가 예전 버전입니다. 새 코드로 다시 배포해 주세요.'}[j.error]||'불러오지 못했습니다.';
       if(j.error==='wrong'||j.error==='locked'){A.key=null;ss.set('admin.key',null)}A.rec=null;render();return}
-    const rec=j.records.map(r=>({at:r[0],period:asPeriod(r[1]),cls:String(r[2]),name:String(r[3]),test:asTest(r[4]),set:asSet(r[5]),kind:r[6],mode:r[7],score:+r[8]||0,time:String(r[9]).replace(/^'/,''),secs:+r[10]||0,reps:r[11],plays:r[12]}));
+    const rec=j.records.map(r=>({at:r[0],period:monthOf(r[0],r[1]),cls:String(r[2]),name:String(r[3]),test:asTest(r[4]),set:asSet(r[5]),kind:r[6],mode:r[7],score:+r[8]||0,time:String(r[9]).replace(/^'/,''),secs:+r[10]||0,reps:r[11],plays:r[12]}));
     A.books=j.books||[];A.settings=j.settings||null;
-    const det=j.details.map(r=>({at:r[0],period:asPeriod(r[1]),cls:String(r[2]),name:String(r[3]),test:asTest(r[4]),set:asSet(r[5]),n:r[7],t:r[8],a:r[9],s:+r[10]||0,p:r[11]}));
+    const det=j.details.map(r=>({at:r[0],period:monthOf(r[0],r[1]),cls:String(r[2]),name:String(r[3]),test:asTest(r[4]),set:asSet(r[5]),n:r[7],t:r[8],a:r[9],s:+r[10]||0,p:r[11]}));
     // 같은 학생이 같은 세트를 몇 번째로 풀었는지 (정답을 본 뒤 다시 푼 기록을 가려내기 위해, 방식과 상관없이)
     const seen={};rec.slice().sort((a,b)=>a.at<b.at?-1:1).forEach(r=>{const k=[r.cls,nk(r.name),r.test,r.set].join('|');r.try=seen[k]=(seen[k]||0)+1});
     A.all={rec,det};setRemoved(j.removed);
